@@ -1,0 +1,52 @@
+name: "Test"
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - "main"
+
+jobs:
+  tests:
+    strategy:
+      # Allow other jobs to finish building and cache properly before bailing
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            install_url: https://nixos.org/nix/install
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: cachix/install-nix-action@v17
+        with:
+          install_url: ${{ matrix.install_url }}
+      - uses: oleksiyrudenko/gha-git-credentials@v2-latest
+        with:
+          token: '${{ secrets.GITHUB_TOKEN }}'
+      - name: flake checks
+        run: |
+          nix flake check --keep-going --print-build-logs ${{ matrix.nixpkgs-override }}
+          for f in $(find /nix/store -name cobertura.xml); do
+            cp -v $f .
+          done
+      - name: Code Coverage Report
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: cobertura.xml
+          badge: true
+          format: text
+          hide_branch_rate: false
+          hide_complexity: true
+          indicators: true
+          output: both
+      - name: update coverage branch
+        run: |
+          set -x
+          git switch --orphan ci/coverage
+          curl -Lso coverage.svg $(grep "^http" code-coverage-results.txt)
+          git add coverage.svg
+          git commit -m 'chore: update coverage'
+          git push -f origin ci/coverage:ci/coverage
+

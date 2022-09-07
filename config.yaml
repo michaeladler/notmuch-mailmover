@@ -1,0 +1,5 @@
+database_path: ~/mail
+config_path: ~/.notmuchrc
+rename: false
+max_age_days: null
+rules: []
