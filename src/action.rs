@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
-use log::{info, warn};
+use log::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::config::Config;
@@ -16,7 +16,7 @@ pub fn apply_actions(cfg: &Config, dry_run: bool, actions: &HashMap<PathBuf, &st
         return Ok(());
     }
 
-    info!("applying {} actions", actions.len());
+    debug!("applying {} actions", actions.len());
 
     let mut counter: usize = 0;
     for (src_file, folder) in actions {
@@ -55,7 +55,7 @@ pub fn apply_actions(cfg: &Config, dry_run: bool, actions: &HashMap<PathBuf, &st
             }
         }
     }
-    info!("moved {} files", counter);
+    debug!("moved {} files", counter);
     Ok(())
 }
 

@@ -8,7 +8,7 @@ use std::{path::PathBuf, time::Instant};
 use anyhow::Result;
 use env_logger::Env;
 use gumdrop::Options;
-use log::debug;
+use log::{debug, info};
 
 #[derive(Debug, Options)]
 struct CliArgs {
@@ -53,7 +53,7 @@ fn main() -> Result<()> {
     action::apply_actions(&cfg, opts.dry_run, &actions)?;
 
     let duration = start.elapsed();
-    debug!("execution took {:?}", duration);
+    info!("execution took {:?}", duration);
 
     Ok(())
 }
