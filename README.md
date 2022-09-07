@@ -3,7 +3,7 @@
 
 # notmuch-mailmover
 
-notmuch-mailmover is a small tool to assign notmuch *tagged* mails to IMAP *folders*.
+notmuch-mailmover is a CLI application to assign notmuch *tagged* mails to IMAP *folders*.
 For example, you can move all mails tagged as `trash` to the `Trash` folder.
 
 It's written in Rust and thus, of course, *blazingly fast*.
@@ -13,6 +13,28 @@ It's written in Rust and thus, of course, *blazingly fast*.
 * using IMAP folders you can sync your tags cross-device (less powerful than [muchsync](http://www.muchsync.org/) but
     easier to setup since you don't need an extra server)
 * delete mail from the IMAP server (i.e. move trash mail to a non-synced folder and let offlineimap/isync do the rest)
+
+## Installation
+
+Prerequisites:
+
+- Rust
+- libnotmuch-dev
+
+Then run
+
+```bash
+cargo install --git 'https://github.com/michaeladler/notmuch-mailmover/'
+```
+
+It is best to invoke `notmuch-mailmover` in your [notmuch pre-new hook](https://notmuch.readthedocs.io/en/latest/man5/notmuch-hooks.html).
+You can also invoke `notmuch-mailmover` directly, but don't forget to run `notmuch new` afterwards (this is not
+necessary if you add it as a pre-hook).
+
+## Configuration
+
+Running `notmuch-mailmover` for the first time will create `$XDG_CONFIG_HOME/notmuch-mailmover/config.yaml`.
+An example file is also [here](./config.yaml) or refer to the example below.
 
 ## Example
 
