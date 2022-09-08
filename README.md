@@ -16,7 +16,18 @@ It's written in Rust and thus, of course, *blazingly fast*.
 
 ## Installation
 
-Prerequisites:
+Only Linux is tested, but Windows and Mac *should* work as well.
+
+## NixOS
+
+```bash
+nix --extra-experimental-features 'nix-command flakes' \
+    profile install 'github:michaeladler/notmuch-mailmover#default'
+```
+
+## Other
+
+**Prerequisites**:
 
 - Rust
 - libnotmuch-dev
@@ -27,7 +38,7 @@ Then run
 cargo install --git 'https://github.com/michaeladler/notmuch-mailmover/'
 ```
 
-It is best to invoke `notmuch-mailmover` in your [notmuch pre-new hook](https://notmuch.readthedocs.io/en/latest/man5/notmuch-hooks.html).
+It's best to invoke `notmuch-mailmover` in your [notmuch pre-new hook](https://notmuch.readthedocs.io/en/latest/man5/notmuch-hooks.html).
 You can also invoke `notmuch-mailmover` directly, but don't forget to run `notmuch new` afterwards (this is not
 necessary if you add it as a pre-hook).
 
