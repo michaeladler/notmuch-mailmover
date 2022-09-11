@@ -8,8 +8,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
-    pub database_path: String,
-    pub config_path: String,
+    pub maildir: String,
+    /// if omitted, it will use the same as notmuch would, see notmuch-config(1)
+    pub notmuch_config: Option<String>,
     pub rename: bool,
     pub max_age_days: Option<u32>,
     pub rules: Vec<Rule>,
@@ -18,8 +19,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            database_path: "~/mail".to_string(),
-            config_path: "~/.notmuchrc".to_string(),
+            maildir: "~/mail".to_string(),
+            notmuch_config: None,
             rename: false,
             max_age_days: None,
             rules: Vec::new(),
@@ -57,11 +58,13 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
             let reader = BufReader::new(f);
             let mut cfg: Config = serde_yaml::from_reader(reader)?;
 
-            let db_path = shellexpand::full(&cfg.database_path)?;
-            cfg.database_path = db_path.to_string();
+            let db_path = shellexpand::full(&cfg.maildir)?;
+            cfg.maildir = db_path.to_string();
 
-            let cfg_path = shellexpand::full(&cfg.config_path)?;
-            cfg.config_path = cfg_path.to_string();
+            if let Some(cfg_path) = cfg.notmuch_config {
+                let path = shellexpand::full(&cfg_path)?;
+                cfg.notmuch_config = Some(path.to_string());
+            }
 
             Ok(cfg)
         }

@@ -24,7 +24,7 @@ pub fn apply_actions(cfg: &Config, dry_run: bool, actions: &HashMap<PathBuf, &st
             .file_name()
             .ok_or_else(|| anyhow!("Failed to get filename from {}", src_file.to_string_lossy()))?;
 
-        let db_path = PathBuf::from(&cfg.database_path);
+        let db_path = PathBuf::from(&cfg.maildir);
         let mut dest_file = db_path.join(folder).join("cur");
         if cfg.rename {
             dest_file.push(get_new_name(basename));
