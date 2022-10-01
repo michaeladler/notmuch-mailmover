@@ -44,9 +44,11 @@ jobs:
       - name: update coverage branch
         run: |
           set -x
-          git switch --orphan ci/coverage
-          curl -Lso coverage.svg $(grep "^http" code-coverage-results.txt)
-          git add coverage.svg
-          git commit -m 'chore: update coverage'
-          git push -f origin ci/coverage:ci/coverage
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            git switch --orphan ci/coverage
+            curl -Lso coverage.svg $(grep "^http" code-coverage-results.txt)
+            git add coverage.svg
+            git commit -m 'chore: update coverage'
+            git push -f origin ci/coverage:ci/coverage
+          fi
 
