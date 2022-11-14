@@ -3,18 +3,17 @@
 
 # notmuch-mailmover
 
-notmuch-mailmover is a tool to move [notmuch](https://notmuchmail.org/) *tagged* mails into [Maildir](https://en.wikipedia.org/wiki/Maildir) *folders*.
-For example, you can move all mails tagged as `trash` to the `Trash` folder.
+notmuch-mailmover is a tool to move [notmuch](https://notmuchmail.org/) tagged mails into [Maildir](https://en.wikipedia.org/wiki/Maildir) folders (e.g., created by [offlineimap](https://github.com/OfflineIMAP/offlineimap3)/[mbsync](https://isync.sourceforge.io/)).
 
-It's written in Rust and thus, of course, *blazingly fast*.
+For example, you can move all mails tagged as `trash` to the `Trash` folder.
 
 ## Use-Cases
 
 Some use-cases are:
 
-* delete mail from IMAP server (e.g. move trash mail to a non-synced folder and let offlineimap/isync do the rest)
-* sync your notmuch tags across devices by using notmuch-mailmover together with with offlineimap/isync
-  (this is similarly to [muchsync](http://www.muchsync.org/) but easier to setup since you don't need to host muchsync)
+* delete mail from IMAP server (e.g. move trash mail to a non-synced folder and let offlineimap/mbsync do the rest)
+* sync your notmuch tags across devices by using notmuch-mailmover in combination with offlineimap/mbsync
+  (this is similarly to [muchsync](http://www.muchsync.org/) but easier to setup since you don't need a muchsync server)
 
 ## Installation
 
@@ -56,7 +55,9 @@ Move all mails
 * tagged as `sent` to folder `Sent`
 * tagged as `archive` to folder `Archive`
 
-```yml
+`config.yaml`:
+
+```yaml
 maildir: ~/mail
 # if omitted (or null), it will use the same as notmuch would, see notmuch-config(1)
 notmuch_config: ~/.config/notmuch/notmuchrc
@@ -78,5 +79,6 @@ So, don't worry about it, notmuch-mailmover will complain if your rules are ambi
 ## Similar Projects
 
 This work is inspired by [afew's Mailmover plugin](https://github.com/afewmail/afew/blob/master/afew/MailMover.py)
-(which I've been using for a long time) but arguably easier to configure because you don't have to configure the source
-folders from which you want to move mails.
+but doesn't require you to setup rules for each folder *individually*. Instead, notmuch-mailmover applies your rules
+*once* to all folders (so it may be easier to configure if you have many folders).
+
