@@ -3,16 +3,18 @@
 
 # notmuch-mailmover
 
-notmuch-mailmover is a CLI application to assign notmuch *tagged* mails to IMAP *folders*.
+notmuch-mailmover is a tool to move [notmuch](https://notmuchmail.org/) *tagged* mails into [Maildir](https://en.wikipedia.org/wiki/Maildir) *folders*.
 For example, you can move all mails tagged as `trash` to the `Trash` folder.
 
 It's written in Rust and thus, of course, *blazingly fast*.
 
 ## Use-Cases
 
-* using IMAP folders you can sync your tags cross-device (less powerful than [muchsync](http://www.muchsync.org/) but
-    easier to setup since you don't need an extra server)
-* delete mail from the IMAP server (i.e., move trash mail to a non-synced folder and let offlineimap/isync do the rest)
+Some use-cases are:
+
+* delete mail from IMAP server (e.g. move trash mail to a non-synced folder and let offlineimap/isync do the rest)
+* sync your notmuch tags across devices by using notmuch-mailmover together with with offlineimap/isync
+  (this is similarly to [muchsync](http://www.muchsync.org/) but easier to setup since you don't need to host muchsync)
 
 ## Installation
 
@@ -36,14 +38,15 @@ Then run
 cargo install --git 'https://github.com/michaeladler/notmuch-mailmover/'
 ```
 
-It's best to invoke `notmuch-mailmover` as a [notmuch pre-new hook](https://notmuch.readthedocs.io/en/latest/man5/notmuch-hooks.html).
-You can also invoke `notmuch-mailmover` directly, but don't forget to run `notmuch new` afterward
-(this isn't necessary if you add it as a pre-hook).
+## Setup
+
+It's recommended to run `notmuch-mailmover` as part of your [notmuch pre-new hook](https://notmuch.readthedocs.io/en/latest/man5/notmuch-hooks.html).
+You can also invoke `notmuch-mailmover` directly, but don't forget to run `notmuch new` afterward (this isn't necessary if you add it as a pre-hook).
 
 ## Configuration
 
 Running `notmuch-mailmover` for the first time will create `$XDG_CONFIG_HOME/notmuch-mailmover/config.yaml`.
-Then adjust it to your needs, see below for an example.
+Then edit the file as you like, see below for an example.
 
 ## Example
 
