@@ -15,7 +15,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9.14"
 directories = "4.0.1"
 gumdrop = "0.8.1"
-shellexpand = "2.1.2"
+shellexpand = "3.0.0"
 
 [dev-dependencies]
 regex = "1.6.0"
