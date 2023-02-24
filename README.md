@@ -19,12 +19,22 @@ Some use-cases are:
 
 Only Linux is tested, but Windows and Mac *should* work as well.
 
-If you use the [nix package manager](https://nixos.org/manual/nix/stable/), you can simply run
+### Arch Linux
+
+[notmuch-mailmover-git](https://aur.archlinux.org/packages/notmuch-mailmover-git) is available on the AUR.
+Use your favorite AUR helper to install it, e.g.
 
 ```bash
-nix --extra-experimental-features 'nix-command flakes' \
-    profile install 'github:michaeladler/notmuch-mailmover#default'
+$ yay -S notmuch-mailmover-git
 ```
+
+### NixOS
+
+```bash
+$ nix-env -iA notmuch-mailmover
+```
+
+### Building from Source
 
 Otherwise, you have to build from source. You need the following build dependencies:
 
