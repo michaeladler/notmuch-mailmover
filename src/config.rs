@@ -53,7 +53,7 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
     };
 
     debug!("loading config {:?}", fname);
-    match File::open(&fname) {
+    match File::open(fname) {
         Ok(f) => {
             let reader = BufReader::new(f);
             let mut cfg: Config = serde_yaml::from_reader(reader)?;
