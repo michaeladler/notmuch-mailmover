@@ -22,7 +22,7 @@ jobs:
       - uses: cachix/install-nix-action@v20
         with:
           install_url: ${{ matrix.install_url }}
-      - uses: oleksiyrudenko/gha-git-credentials@v2-latest
+      - uses: oleksiyrudenko/gha-git-credentials@v2.1.1
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
       - name: flake checks
