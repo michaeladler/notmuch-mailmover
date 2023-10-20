@@ -11,10 +11,10 @@ pub fn apply_rules<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<P
     debug!("applying rules");
     let mut actions = HashMap::new();
 
-    {
-        // sanity check: do rules overlap?
+    let n = cfg.rules.len();
+    if n > 0 {
+        debug!("checking if rules overlap");
         let mut combined_query = String::with_capacity(1024);
-        let n = cfg.rules.len();
         for rule in cfg.rules.iter().take(n - 1) {
             write!(combined_query, "({}) AND ", rule.query)?;
         }
