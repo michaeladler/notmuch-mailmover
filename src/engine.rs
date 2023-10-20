@@ -2,7 +2,7 @@ use std::fmt::Write as _;
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{anyhow, Result};
-use log::debug;
+use log::{debug, error};
 
 use crate::config::Config;
 use crate::repo::MailRepo;
@@ -13,20 +13,35 @@ pub fn apply_rules<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<P
 
     let n = cfg.rules.len();
     if n > 0 {
-        debug!("checking if rules overlap");
-        let mut combined_query = String::with_capacity(1024);
-        for rule in cfg.rules.iter().take(n - 1) {
-            write!(combined_query, "({}) AND ", rule.query)?;
+        let mut overlap_count: usize = 0;
+
+        debug!("checking if any two rules overlap");
+        let mut combined_query = String::with_capacity(2048);
+        for i in 0..n - 1 {
+            for j in i + 1..n {
+                let lhs = cfg.rules.get(i).unwrap();
+                let rhs = cfg.rules.get(j).unwrap();
+
+                combined_query.clear();
+                write!(combined_query, "({}) AND ({})", lhs.query, rhs.query)?;
+                if let Some(days) = cfg.max_age_days {
+                    write!(combined_query, " AND date:\"{}_days\"..", days)?;
+                }
+                debug!("combined query: {}", combined_query);
+                let messages = repo.search_message(&combined_query)?;
+                if !messages.is_empty() {
+                    let count = messages.len();
+                    overlap_count += count;
+                    error!(
+                        "Queries '{}' and '{}' overlap ({} messages)",
+                        lhs.query, rhs.query, count
+                    );
+                }
+            }
         }
-        write!(combined_query, "({})", cfg.rules[n - 1].query)?;
-        if let Some(days) = cfg.max_age_days {
-            write!(combined_query, " AND date:\"{}_days\"..", days)?;
-        }
-        debug!("combined query: {}", combined_query);
-        let messages = repo.search_message(&combined_query)?;
-        let count = messages.len();
-        if count > 0 {
-            return Err(anyhow!("Rules overlap! overlap count: {}", count));
+
+        if overlap_count > 0 {
+            return Err(anyhow!("Rules overlap ({} messages)", overlap_count));
         }
     }
 
