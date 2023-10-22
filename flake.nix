@@ -40,8 +40,10 @@
 
           postInstall = with pkgs; ''
             installManPage share/notmuch-mailmover.1
-            installShellCompletion --zsh --name _notmuch-mailmover ./share/_notmuch-mailmover
-            installShellCompletion --bash --name notmuch-mailmover.bash ./share/notmuch-mailmover.bash
+            installShellCompletion --cmd notmuch-mailmover \
+              --bash share/notmuch-mailmover.bash \
+              --fish share/notmuch-mailmover.fish \
+              --zsh share/_notmuch-mailmover
           '';
         };
       in
