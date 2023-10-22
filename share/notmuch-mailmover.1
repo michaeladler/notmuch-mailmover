@@ -2,31 +2,30 @@
 .el .ds Aq '
 .TH notmuch-mailmover 1  "notmuch-mailmover 0.2.0" 
 .SH NAME
-notmuch\-mailmover \- Move notmuch tagged mails into Maildir folders
+notmuch\-mailmover
 .SH SYNOPSIS
-\fBnotmuch\-mailmover\fR [\fB\-c\fR|\fB\-\-config\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fILOG_LEVEL\fR] [\fIDRY_RUN\fR] 
+\fBnotmuch\-mailmover\fR [\fB\-c\fR|\fB\-\-config\fR] [\fB\-l\fR|\fB\-\-log\-level\fR] [\fB\-d\fR|\fB\-\-dry\-run\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] 
 .SH DESCRIPTION
-Move notmuch tagged mails into Maildir folders
 .SH OPTIONS
 .TP
 \fB\-c\fR, \fB\-\-config\fR=\fIFILE\fR
 Use the provided config file instead of the default
+.TP
+\fB\-l\fR, \fB\-\-log\-level\fR=\fILOG_LEVEL\fR [default: info]
+Configure the log level
+.br
+
+.br
+[\fIpossible values: \fRtrace, info, debug, warn, error]
+.TP
+\fB\-d\fR, \fB\-\-dry\-run\fR
+Enable dry\-run mode, i.e. no files are being moved
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 Print version
-.TP
-[\fILOG_LEVEL\fR]
-Configure the log level
-.TP
-[\fIDRY_RUN\fR]
-Enable dry\-run mode, i.e. no files are being moved
-.br
-
-.br
-[\fIpossible values: \fRtrue, false]
 .SH VERSION
 v0.2.0
 .SH AUTHORS

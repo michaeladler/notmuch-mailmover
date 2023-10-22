@@ -19,7 +19,7 @@ _notmuch-mailmover() {
 
     case "${cmd}" in
         notmuch__mailmover)
-            opts="-c -h -V --config --help --version [LOG_LEVEL] true false"
+            opts="-c -l -d -h -V --config --log-level --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -31,6 +31,14 @@ _notmuch-mailmover() {
                     ;;
                 -c)
                     COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --log-level)
+                    COMPREPLY=($(compgen -W "trace info debug warn error" -- "${cur}"))
+                    return 0
+                    ;;
+                -l)
+                    COMPREPLY=($(compgen -W "trace info debug warn error" -- "${cur}"))
                     return 0
                     ;;
                 *)
