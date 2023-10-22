@@ -34,11 +34,11 @@ _notmuch-mailmover() {
                     return 0
                     ;;
                 --log-level)
-                    COMPREPLY=($(compgen -W "trace info debug warn error" -- "${cur}"))
+                    COMPREPLY=($(compgen -W "trace debug info warn error" -- "${cur}"))
                     return 0
                     ;;
                 -l)
-                    COMPREPLY=($(compgen -W "trace info debug warn error" -- "${cur}"))
+                    COMPREPLY=($(compgen -W "trace debug info warn error" -- "${cur}"))
                     return 0
                     ;;
                 *)

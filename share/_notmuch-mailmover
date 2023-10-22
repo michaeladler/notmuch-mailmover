@@ -17,8 +17,8 @@ _notmuch-mailmover() {
     _arguments "${_arguments_options[@]}" \
 '-c+[Use the provided config file instead of the default]:FILE:_files' \
 '--config=[Use the provided config file instead of the default]:FILE:_files' \
-'-l+[Configure the log level]:LOG_LEVEL:(trace info debug warn error)' \
-'--log-level=[Configure the log level]:LOG_LEVEL:(trace info debug warn error)' \
+'-l+[Configure the log level]:LOG_LEVEL:(trace debug info warn error)' \
+'--log-level=[Configure the log level]:LOG_LEVEL:(trace debug info warn error)' \
 '-d[Enable dry-run mode, i.e. no files are being moved]' \
 '--dry-run[Enable dry-run mode, i.e. no files are being moved]' \
 '-h[Print help]' \

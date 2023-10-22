@@ -25,9 +25,9 @@ pub struct Cli {
 #[derive(Clone, ValueEnum, Debug, Default)]
 pub enum LogLevel {
     Trace,
+    Debug,
     #[default]
     Info,
-    Debug,
     Warn,
     Error,
 }
