@@ -20,6 +20,6 @@ jobs:
       - uses: taiki-e/create-gh-release-action@v1
         with:
           changelog: CHANGELOG.md
-          branch: 'main|v[0-9]+'
+          branch: "main|v[0-9]+"
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}

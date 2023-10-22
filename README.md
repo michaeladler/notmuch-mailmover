@@ -1,5 +1,5 @@
 [![Test](https://github.com/michaeladler/notmuch-mailmover/actions/workflows/test.yml/badge.svg)](https://github.com/michaeladler/notmuch-mailmover/actions/workflows/test.yml)
-![Code Coverage](https://github.com/michaeladler/notmuch-mailmover/raw/ci/coverage/coverage.svg)
+[![codecov](https://codecov.io/gh/michaeladler/notmuch-mailmover/graph/badge.svg?token=6U7O3F51P7)](https://codecov.io/gh/michaeladler/notmuch-mailmover)
 
 # notmuch-mailmover
 

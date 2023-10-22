@@ -32,7 +32,17 @@
         notmuch-mailmover = craneLib.buildPackage {
           inherit cargoArtifacts src;
 
-          buildInputs = with pkgs; [ pkgs.notmuch ];
+          nativeBuildInputs = with pkgs; [
+            installShellFiles
+          ];
+
+          buildInputs = with pkgs; [ notmuch ];
+
+          postInstall = with pkgs; ''
+            installManPage share/notmuch-mailmover.1
+            installShellCompletion --zsh --name _notmuch-mailmover ./share/_notmuch-mailmover
+            installShellCompletion --bash --name notmuch-mailmover.bash ./share/notmuch-mailmover.bash
+          '';
         };
       in
       {
