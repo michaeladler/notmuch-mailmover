@@ -14,10 +14,7 @@ use log::{debug, info};
 fn main() -> Result<()> {
     let opts = cli::Cli::parse();
 
-    let env = match &opts.log_level {
-        Some(log_level) => Env::default().default_filter_or(log_level),
-        None => Env::default().default_filter_or("info"),
-    };
+    let env = Env::default().default_filter_or(opts.log_level.to_string());
     env_logger::try_init_from_env(env)?;
 
     let cfg = config::load_config(&opts.config)?;
@@ -33,8 +30,7 @@ fn main() -> Result<()> {
     let start = Instant::now();
 
     let actions = engine::apply_rules(&cfg, &db)?;
-    let dry_run = opts.dry_run.unwrap_or_default();
-    action::apply_actions(&cfg, dry_run, &actions)?;
+    action::apply_actions(&cfg, opts.dry_run, &actions)?;
 
     let duration = start.elapsed();
     info!("execution took {:?}", duration);

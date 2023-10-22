@@ -4,7 +4,7 @@ use std::{
     path::Path,
 };
 
-use clap::{CommandFactory, ValueEnum};
+use clap::CommandFactory;
 use clap_complete::{generate_to, Shell};
 use clap_mangen::Man;
 
