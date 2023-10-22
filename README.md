@@ -1,4 +1,4 @@
-[![Test](https://github.com/michaeladler/notmuch-mailmover/actions/workflows/test.yml/badge.svg)](https://github.com/michaeladler/notmuch-mailmover/actions/workflows/test.yml)
+[![CI](https://github.com/michaeladler/notmuch-mailmover/actions/workflows/ci.yml/badge.svg)](https://github.com/michaeladler/notmuch-mailmover/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/michaeladler/notmuch-mailmover/graph/badge.svg?token=6U7O3F51P7)](https://codecov.io/gh/michaeladler/notmuch-mailmover)
 
 # notmuch-mailmover
