@@ -14,6 +14,7 @@ Some use-cases are:
 * delete mail from IMAP server (e.g. move trash mail to a non-synced folder and let offlineimap/mbsync do the rest)
 * sync your notmuch tags across devices by using notmuch-mailmover in combination with offlineimap/mbsync
   (this is similarly to [muchsync](http://www.muchsync.org/) but easier to setup since you don't need a muchsync server)
+* purge old mails from the IMAP server (by moving them out of synced folders)
 
 ## Installation
 
