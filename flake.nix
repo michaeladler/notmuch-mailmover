@@ -12,13 +12,12 @@
 
   outputs = { self, nixpkgs, crane, flake-utils, ... }:
 
-    flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
+    flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs {
-          inherit system;
-        };
+        pkgs = nixpkgs.legacyPackages.${system};
 
-        craneLib = crane.lib.${system};
+        craneLib = crane.mkLib pkgs;
+
         src = ./.;
 
         # Build *just* the cargo dependencies, so we can reuse
@@ -38,7 +37,7 @@
 
           buildInputs = with pkgs; [ notmuch ];
 
-          postInstall = with pkgs; ''
+          postInstall = ''
             installManPage share/notmuch-mailmover.1
             installShellCompletion --cmd notmuch-mailmover \
               --bash share/notmuch-mailmover.bash \
@@ -73,7 +72,7 @@
           notmuch-mailmover-coverage = craneLib.cargoTarpaulin {
             inherit cargoArtifacts src;
 
-            buildInputs = with pkgs; [ pkgs.notmuch ];
+            buildInputs = [ pkgs.notmuch ];
           };
         };
 
