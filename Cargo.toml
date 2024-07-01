@@ -24,7 +24,7 @@ regex = "1.10.4"
 
 [build-dependencies]
 clap = { version = "4.5.4", features = [ "derive", "cargo" ] }
-clap_complete = "4.5.2"
+clap_complete = "4.5.3"
 clap_mangen = "0.2.20"
 
 [profile.release]
