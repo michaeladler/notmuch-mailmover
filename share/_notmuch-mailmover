@@ -14,7 +14,7 @@ _notmuch-mailmover() {
     fi
 
     local context curcontext="$curcontext" state line
-    _arguments "${_arguments_options[@]}" \
+    _arguments "${_arguments_options[@]}" : \
 '-c+[Use the provided config file instead of the default]:FILE:_files' \
 '--config=[Use the provided config file instead of the default]:FILE:_files' \
 '-l+[Configure the log level]:LOG_LEVEL:(trace debug info warn error)' \
