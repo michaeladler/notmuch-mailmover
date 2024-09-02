@@ -1,15 +1,10 @@
-mod action;
-mod cli;
-mod config;
-mod engine;
-mod repo;
-
-use clap::Parser;
-use std::time::Instant;
-
 use anyhow::Result;
+use clap::Parser;
 use env_logger::Env;
 use log::{debug, info};
+use std::time::Instant;
+
+use nm_mailmover::{action, cli, config, engine};
 
 fn main() -> Result<()> {
     let opts = cli::Cli::parse();

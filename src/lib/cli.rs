@@ -1,11 +1,21 @@
 use std::path::PathBuf;
 
-use clap::{crate_authors, crate_version, Parser, ValueEnum};
+use clap::{crate_authors, Parser, ValueEnum};
+
+use git_version::git_version;
+
+pub const VERSION: &str = git_version!(
+    cargo_prefix = "",
+    prefix = "",
+    // Note that on the CLI, the v* needs to be in single quotes
+    // When passed here though there seems to be some magic quoting that happens.
+    args = ["--always", "--dirty=-dirty", "--match=v*", "--tags"]
+);
 
 #[derive(Parser)]
 #[clap(
     name = "notmuch-mailmover",
-    version = crate_version!(),
+    version = VERSION,
     author = crate_authors!(),
 )]
 pub struct Cli {

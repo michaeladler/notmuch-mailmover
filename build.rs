@@ -1,5 +1,4 @@
 use std::{
-    env,
     fs::{create_dir_all, File},
     path::Path,
 };
@@ -8,22 +7,20 @@ use clap::CommandFactory;
 use clap_complete::{generate_to, Shell};
 use clap_mangen::Man;
 
-include!("src/cli.rs");
+include!("src/lib/cli.rs");
 
 fn main() {
-    println!("cargo:rerun-if-env-changed=GEN_ARTIFACTS");
+    println!("cargo::rerun-if-changed=src/lib/cli.rs");
 
-    if let Some(dir) = env::var_os("GEN_ARTIFACTS") {
-        let out = &Path::new(&dir);
-        create_dir_all(out).unwrap();
-        let cmd = &mut Cli::command();
+    let out = &Path::new("share");
+    create_dir_all(out).unwrap();
+    let cmd = &mut Cli::command();
 
-        Man::new(cmd.clone())
-            .render(&mut File::create(out.join("notmuch-mailmover.1")).unwrap())
-            .unwrap();
+    Man::new(cmd.clone())
+        .render(&mut File::create(out.join("notmuch-mailmover.1")).unwrap())
+        .unwrap();
 
-        for shell in Shell::value_variants() {
-            generate_to(*shell, cmd, "notmuch-mailmover", out).unwrap();
-        }
+    for shell in Shell::value_variants() {
+        generate_to(*shell, cmd, "notmuch-mailmover", out).unwrap();
     }
 }

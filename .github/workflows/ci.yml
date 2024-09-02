@@ -6,11 +6,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed to embed version information
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Install deps
         run: sudo apt-get update -q && sudo apt-get install -y libnotmuch-dev
-      - run: cargo build
+      - run: cargo build --release
       - run: cargo test --all-features
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notmuch-mailmover
+          path: |
+            target/release/notmuch-mailmover
 
   format:
     name: cargo fmt
@@ -32,21 +39,6 @@ jobs:
         with:
           components: clippy
       - run: cargo clippy
-
-  generate:
-    name: generate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - name: Install deps
-        run: sudo apt-get update -q && sudo apt-get install -y libnotmuch-dev
-      - name: Generate files
-        run: cargo build
-        env:
-          GEN_ARTIFACTS: share
-      - name: Check if files have changed
-        run: git diff --exit-code
 
   coverage:
     runs-on: ubuntu-latest
