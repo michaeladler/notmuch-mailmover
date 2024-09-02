@@ -1,25 +1,33 @@
 name: Release
 
-permissions:
-  contents: write
-
 on:
   push:
     tags:
-      - v[0-9]+.*
+      - "v*"
 
-defaults:
-  run:
-    shell: bash
+permissions:
+  contents: write
 
 jobs:
-  create-release:
+  release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: taiki-e/create-gh-release-action@v1
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          changelog: CHANGELOG.md
-          branch: "main|v[0-9]+"
-          draft: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5 # for dummy.go
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install build deps
+        run: sudo apt-get update -q && sudo apt-get install -y libnotmuch-dev
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: 'latest'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

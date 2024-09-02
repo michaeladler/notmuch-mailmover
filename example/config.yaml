@@ -1,0 +1,17 @@
+maildir: ~/mail
+# if omitted (or null), it will use the same as notmuch would, see notmuch-config(1)
+notmuch_config: ~/.config/notmuch/notmuchrc
+# only rename if you use mbsync
+rename: true
+rules:
+  # move mails tagged as `trash` to folder `Trash`
+  - folder: Trash
+    query: tag:trash
+
+  # move mails tagged as `sent` to folder `Sent`
+  - folder: Sent
+    query: tag:sent and not tag:trash
+
+  # move mails tagged as `archive` to folder `Archive`
+  - folder: Archive
+    query: tag:archive and not tag:sent and not tag:trash

@@ -33,7 +33,7 @@
           buildInputs = with pkgs; [ notmuch ];
 
           postInstall = ''
-            installManPage share/notmuch-mailmover.1
+            installManPage share/notmuch-mailmover.1.gz
             installShellCompletion --cmd notmuch-mailmover \
               --bash share/notmuch-mailmover.bash \
               --fish share/notmuch-mailmover.fish \

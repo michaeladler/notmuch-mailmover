@@ -3,5 +3,8 @@
 with pkgs;
 
 mkShell {
-  buildInputs = [ notmuch ];
+  buildInputs = [
+    notmuch
+    nodePackages.markdown-link-check
+  ];
 }

@@ -60,28 +60,11 @@ Then edit the file as you like, see below for an example.
 
 ## Example
 
-Move all mails
+The provided [config.yaml](./example/config.yaml) does the following:
 
-* tagged as `trash` to folder `Trash`
-* tagged as `sent` to folder `Sent`
-* tagged as `archive` to folder `Archive`
-
-`config.yaml`:
-
-```yaml
-maildir: ~/mail
-# if omitted (or null), it will use the same as notmuch would, see notmuch-config(1)
-notmuch_config: ~/.config/notmuch/notmuchrc
-# only rename if you use mbsync
-rename: true
-rules:
-  - folder: Trash
-    query: tag:trash
-  - folder: Sent
-    query: tag:sent and not tag:trash
-  - folder: Archive
-    query: tag:archive and not tag:sent and not tag:trash
-```
+* move mails tagged as `trash` to folder `Trash`
+* move mails tagged as `sent` to folder `Sent`
+* move mails tagged as `archive` to folder `Archive`
 
 **Note**: Queries **must not overlap** (hence the `and not tag:trash` clause in the second query).
 This is to avoid moving files more than once and checked by notmuch-mailmover *before* any files are moved.

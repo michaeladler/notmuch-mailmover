@@ -1,0 +1,95 @@
+version: 2
+
+project_name: notmuch-mailmover
+
+builds:
+  - id: notmuch-mailmover
+    main: dummy.go
+    goarch:
+      - amd64
+    goos:
+      - linux
+    binary: notmuch-mailmover
+    hooks:
+      post: sh .ci/build.sh
+
+archives:
+  - id: notmuch-mailmover
+    builds:
+      - notmuch-mailmover
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- if eq .Os "darwin" }}macOS
+      {{- else if eq .Os "linux" }}Linux
+      {{- else }}{{ .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+    format: tar.zst
+    files:
+      - LICENSE
+      - share
+
+nfpms:
+  - id: notmuch-mailmover
+    package_name: notmuch-mailmover
+    builds:
+      - notmuch-mailmover
+    formats:
+      - deb
+      - rpm
+      - archlinux
+    maintainer: Michael Adler <therisen06@gmail.com>
+    homepage: https://github.com/michaeladler/notmuch-mailmover
+    description:  move notmuch tagged mails into Maildir folders
+    dependencies:
+      - notmuch
+    section: mail
+    priority: extra
+    contents:
+      # zsh completion
+      - src: share/_notmuch-mailmover
+        dst: /usr/share/zsh/site-functions/_notmuch-mailmover
+      # zsh completion for Debian
+      - src: /usr/share/zsh/site-functions/_notmuch-mailmover
+        dst: /usr/share/zsh/vendor-completions/_notmuch-mailmover
+        type: symlink
+        packager: deb
+
+      # bash completion
+      - src: share/notmuch-mailmover.bash
+        dst: /usr/share/bash-completion/completions/notmuch-mailmover
+
+      # fish completion
+      - src: share/notmuch-mailmover.fish
+        dst: /usr/share/fish/completions/notmuch-mailmover.fish
+
+      # man page
+      - src: share/notmuch-mailmover.1.gz
+        dst: /usr/share/man/man1/notmuch-mailmover.1.gz
+
+      # example config
+      - src: example/config.yaml
+        dst: /usr/share/doc/notmuch-mailmover/config.yaml
+
+checksum:
+  name_template: 'checksums.txt'
+
+release:
+  draft: true
+  replace_existing_draft: true
+
+changelog:
+  sort: asc
+  groups:
+    - title: Features
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: "Bug fixes"
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: Others
+      order: 999
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
