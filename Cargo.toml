@@ -20,7 +20,7 @@ shellexpand = "3.0.0"
 clap = { version = "4.5.13", features = [ "derive", "cargo" ] }
 
 [dev-dependencies]
-regex = "1.10.5"
+regex = "1.10.6"
 
 [build-dependencies]
 clap = { version = "4.5.13", features = [ "derive", "cargo" ] }
