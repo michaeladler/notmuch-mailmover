@@ -11,7 +11,9 @@ impl MailRepo for notmuch::Database {
         let messages = nm_query.search_messages()?;
         let mut result: Vec<PathBuf> = Vec::new();
         for msg in messages {
-            result.push(msg.filename().to_path_buf());
+            for fname in msg.filenames() {
+                result.push(fname);
+            }
         }
         Ok(result)
     }
