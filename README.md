@@ -58,6 +58,10 @@ You can also invoke `notmuch-mailmover` directly, but don't forget to run `notmu
 Running `notmuch-mailmover` for the first time will create `$XDG_CONFIG_HOME/notmuch-mailmover/config.yaml`.
 Then edit the file as you like, see below for an example.
 
+The configuration is largely self-explanatory, except perhaps for the choice of the `rule_match_mode`.
+You need to decide whether you want your rules to be pairwise distinct (meaning the queries must not overlap) or ambiguous (where the first or last matching rule wins).
+The `unique` approach is more explicit but also more verbose, while the `first` or `all` approach is more concise but may lead to unexpected behavior if you have overlapping rules, as the order of the rules matters.
+
 ## Example
 
 The provided [config.yaml](./example/config.yaml) does the following:
@@ -66,13 +70,10 @@ The provided [config.yaml](./example/config.yaml) does the following:
 * move mails tagged as `sent` to folder `Sent`
 * move mails tagged as `archive` to folder `Archive`
 
-**Note**: Queries **must not overlap** (hence the `and not tag:trash` clause in the second query).
-This is to avoid moving files more than once and checked by notmuch-mailmover *before* any files are moved.
-So, don't worry about it, notmuch-mailmover will complain if your rules are ambiguous.
+See [config_first.yaml](./example/config_first.yaml) for a different approach (using the `first` strategy for `rule_match_mode`).
 
 ## Similar Projects
 
 This work is inspired by [afew's Mailmover plugin](https://github.com/afewmail/afew/blob/master/afew/MailMover.py)
 but doesn't require you to setup rules for each folder *individually*. Instead, notmuch-mailmover applies your rules
 *once* to all folders (so it may be easier to configure if you have many folders).
-

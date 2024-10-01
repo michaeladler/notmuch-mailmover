@@ -1,29 +1,32 @@
 maildir: ~/mail
 # if omitted (or null), it will use the same as notmuch would, see notmuch-config(1)
 notmuch_config: ~/.config/notmuch/notmuchrc
-
 # only rename if you use mbsync
 rename: true
+
+# only apply rules to messages younger than 60 days (to speed things up)
+max_age_days: 60
 
 # rule_match_mode can be one of `unique`, `first`, `all` and determines how rules are applied;
 # rule_match_mode is optional and defaults to `unique`; the following modes are available:
 #   - first: the first rule that matches will be applied
 #   - all: all rules that match will be applied (in order), i.e. a single mail can be moved multiple times
 #   - unique: like first, but ensure that a mail is only moved once
-rule_match_mode: unique
-
-# NOTE: rule_match_mode `unique` means that queries must NOT overlap (hence the `and not tag:trash` clause in the second query).
-# This is to avoid moving files more than once and checked by notmuch-mailmover *before* any files are moved.
-# So, don't worry about it, notmuch-mailmover will complain if your rules are ambiguous.
+rule_match_mode: first
 rules:
+  # move mails older than 30 days from Trash to Nirvana;
+  # if Nirvana is not synced with the remote mailserver, then this is housekeeping for the server side
+  - folder: Nirvana
+    query: tag:trash and date:..30_days
+
   # move mails tagged as `trash` to folder `Trash`
   - folder: Trash
     query: tag:trash
 
   # move mails tagged as `sent` to folder `Sent`
   - folder: Sent
-    query: tag:sent and not tag:trash
+    query: tag:sent
 
   # move mails tagged as `archive` to folder `Archive`
   - folder: Archive
-    query: tag:archive and not tag:sent and not tag:trash
+    query: tag:archive

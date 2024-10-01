@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
-use log::{debug, info, warn};
+use log::{debug, info, trace, warn};
 use uuid::Uuid;
 
 use crate::config::Config;
@@ -32,27 +32,36 @@ pub fn apply_actions(cfg: &Config, dry_run: bool, actions: &HashMap<PathBuf, &st
             dest_file.push(basename);
         };
 
+        if *src_file == dest_file {
+            trace!(
+                "skipping {} as source and destination are the same",
+                src_file.to_string_lossy()
+            );
+            continue;
+        }
+
         if dry_run {
             info!(
                 "would move {} to {}",
                 src_file.to_string_lossy(),
                 dest_file.to_string_lossy()
             );
+            continue;
+        }
+
+        info!(
+            "moving {} to {}",
+            src_file.to_string_lossy(),
+            dest_file.to_string_lossy()
+        );
+        if src_file.exists() {
+            fs::rename(src_file, dest_file)?;
+            counter += 1;
         } else {
-            info!(
-                "moving {} to {}",
-                src_file.to_string_lossy(),
-                dest_file.to_string_lossy()
+            warn!(
+                "{} has vanished. Try running 'notmuch new'",
+                src_file.to_string_lossy()
             );
-            if src_file.exists() {
-                fs::rename(src_file, dest_file)?;
-                counter += 1;
-            } else {
-                warn!(
-                    "{} has vanished. Try running 'notmuch new'",
-                    src_file.to_string_lossy()
-                );
-            }
         }
     }
     debug!("moved {} files", counter);

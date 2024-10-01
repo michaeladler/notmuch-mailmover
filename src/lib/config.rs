@@ -4,9 +4,9 @@ use std::{io::BufReader, path::PathBuf};
 use anyhow::{anyhow, Result};
 use directories::BaseDirs;
 use log::debug;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub maildir: String,
     /// if omitted, it will use the same as notmuch would, see notmuch-config(1)
@@ -14,6 +14,59 @@ pub struct Config {
     pub rename: bool,
     pub max_age_days: Option<u32>,
     pub rules: Vec<Rule>,
+    pub rule_match_mode: Option<MatchMode>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum MatchMode {
+    Unique,
+    First,
+    All,
+}
+
+impl Serialize for MatchMode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        use MatchMode::*;
+        match self {
+            Unique => serializer.serialize_str("unique"),
+            First => serializer.serialize_str("first"),
+            All => serializer.serialize_str("all"),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for MatchMode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct MatchModeVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for MatchModeVisitor {
+            type Value = MatchMode;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string representing a match mode")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<MatchMode, E>
+            where
+                E: serde::de::Error,
+            {
+                match value {
+                    "unique" => Ok(MatchMode::Unique),
+                    "first" => Ok(MatchMode::First),
+                    "all" => Ok(MatchMode::All),
+                    _ => Err(E::custom(format!("unknown match mode: {}", value))),
+                }
+            }
+        }
+
+        deserializer.deserialize_str(MatchModeVisitor)
+    }
 }
 
 impl Default for Config {
@@ -24,14 +77,21 @@ impl Default for Config {
             rename: false,
             max_age_days: None,
             rules: Vec::new(),
+            rule_match_mode: None,
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Rule {
     pub folder: String,
     pub query: String,
+}
+
+impl std::fmt::Display for Rule {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Rule {}: {}", self.folder, self.query)
+    }
 }
 
 pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
