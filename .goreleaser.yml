@@ -37,7 +37,6 @@ nfpms:
     formats:
       - deb
       - rpm
-      - archlinux
     maintainer: Michael Adler <therisen06@gmail.com>
     homepage: https://github.com/michaeladler/notmuch-mailmover
     description:  move notmuch tagged mails into Maildir folders
