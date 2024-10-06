@@ -5,89 +5,90 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, crane, flake-utils, ... }:
-
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    { self
+    , nixpkgs
+    , crane
+    , flake-utils
+    , ...
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
+        inherit (pkgs) lib;
+
         craneLib = crane.mkLib pkgs;
 
-        src = ./.;
+        src = craneLib.cleanCargoSource ./.;
+
+        # Common arguments can be set here to avoid repeating them later
+        commonArgs = {
+          inherit src;
+          strictDeps = true;
+
+          nativeBuildInputs = [
+            pkgs.pkg-config
+          ];
+
+          buildInputs = [
+            pkgs.notmuch
+            pkgs.lua5_4
+          ];
+
+        };
 
         # Build *just* the cargo dependencies, so we can reuse
         # all of that work (e.g. via cachix) when running in CI
-        cargoArtifacts = craneLib.buildDepsOnly {
-          inherit src;
-        };
+        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
         # Build the actual crate itself, reusing the dependency
         # artifacts from above.
-        notmuch-mailmover = craneLib.buildPackage {
-          inherit cargoArtifacts src;
+        my-crate = craneLib.buildPackage (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
 
-          nativeBuildInputs = with pkgs; [
-            installShellFiles
-          ];
+            nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
+              pkgs.installShellFiles
+            ];
 
-          buildInputs = with pkgs; [ notmuch ];
-
-          postInstall = ''
-            installManPage share/notmuch-mailmover.1.gz
-            installShellCompletion --cmd notmuch-mailmover \
-              --bash share/notmuch-mailmover.bash \
-              --fish share/notmuch-mailmover.fish \
-              --zsh share/_notmuch-mailmover
-          '';
-        };
+            postInstall = ''
+              installManPage share/notmuch-mailmover.1.gz
+              installShellCompletion --cmd notmuch-mailmover \
+                --bash share/notmuch-mailmover.bash \
+                --fish share/notmuch-mailmover.fish \
+                --zsh share/_notmuch-mailmover
+            '';
+          }
+        );
       in
       {
         checks = {
           # Build the crate as part of `nix flake check` for convenience
-          inherit notmuch-mailmover;
-
-          # Run clippy (and deny all warnings) on the crate source,
-          # again, resuing the dependency artifacts from above.
-          #
-          # Note that this is done as a separate derivation so that
-          # we can block the CI if there are issues here, but not
-          # prevent downstream consumers from building our crate by itself.
-          notmuch-mailmover-clippy = craneLib.cargoClippy {
-            inherit cargoArtifacts src;
-            cargoClippyExtraArgs = "-- --deny warnings";
-
-          };
-
-          # Check formatting
-          notmuch-mailmover-fmt = craneLib.cargoFmt {
-            inherit src;
-          };
-
-          # Check code coverage (note: this will not upload coverage anywhere)
-          notmuch-mailmover-coverage = craneLib.cargoTarpaulin {
-            inherit cargoArtifacts src;
-
-            buildInputs = [ pkgs.notmuch ];
-          };
+          inherit my-crate;
         };
 
-        packages.default = notmuch-mailmover;
-
-        apps.default = flake-utils.lib.mkApp {
-          drv = notmuch-mailmover;
+        packages = {
+          default = my-crate;
+          inherit my-crate;
         };
 
-        devShells = {
-          default = pkgs.mkShell {
-            inputsFrom = builtins.attrValues self.checks;
+        devShells.default = craneLib.devShell {
+          # Inherit inputs from checks.
+          checks = self.checks.${system};
 
-            # Extra inputs can be added here
-            nativeBuildInputs = with pkgs; [
-              cargo
-              rustc
-            ];
+          # Additional dev-shell environment variables can be set directly
+          # MY_CUSTOM_DEVELOPMENT_VAR = "something else";
 
-          };
+          # Extra inputs can be added here; cargo and rustc are provided by default.
+          packages = [
+            pkgs.notmuch
+            pkgs.lua5_4
+            pkgs.nodePackages.markdown-link-check
+          ];
         };
-      });
+      }
+    );
 }

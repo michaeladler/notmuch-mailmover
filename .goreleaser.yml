@@ -66,9 +66,9 @@ nfpms:
       - src: share/notmuch-mailmover.1.gz
         dst: /usr/share/man/man1/notmuch-mailmover.1.gz
 
-      # example config
-      - src: example/config.yaml
-        dst: /usr/share/doc/notmuch-mailmover/config.yaml
+      # example configurations
+      - src: example/
+        dst: /usr/share/doc/notmuch-mailmover/example/
 
 checksum:
   name_template: 'checksums.txt'

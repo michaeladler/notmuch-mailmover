@@ -10,7 +10,7 @@ jobs:
           fetch-depth: 0 # needed to embed version information
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Install deps
-        run: sudo apt-get update -q && sudo apt-get install -y libnotmuch-dev
+        run: sudo .ci/install-deps.sh
       - run: cargo build --release
       - run: cargo test --all-features
       - uses: actions/upload-artifact@v4
@@ -38,6 +38,8 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: clippy
+      - name: Install deps
+        run: sudo .ci/install-deps.sh
       - run: cargo clippy
 
   coverage:
@@ -50,7 +52,7 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Install deps
-        run: sudo apt-get update -q && sudo apt-get install -y libnotmuch-dev
+        run: sudo .ci/install-deps.sh
       - name: Generate code coverage
         run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
       - name: Upload coverage to Codecov

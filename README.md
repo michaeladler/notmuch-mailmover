@@ -37,10 +37,11 @@ $ nix-env -iA notmuch-mailmover
 
 ### Building from Source
 
-Otherwise, you have to build from source. You need the following build dependencies:
+Otherwise, you have to build from source. You need the following build dependencies (see [install-deps.sh](.ci/install-deps.sh)):
 
 - Rust
 - libnotmuch-dev
+- liblua5.4-dev
 
 Then run
 
@@ -57,6 +58,8 @@ You can also invoke `notmuch-mailmover` directly, but don't forget to run `notmu
 
 Running `notmuch-mailmover` for the first time will create `$XDG_CONFIG_HOME/notmuch-mailmover/config.yaml`.
 Then edit the file as you like, see below for an example.
+Alternatively, it's possible to write the configuration in Lua 5.4 by creating `config.lua` instead.
+See the provided [config.lua](example/config.lua) for an example.
 
 The configuration is largely self-explanatory, except perhaps for the choice of the `rule_match_mode`.
 You need to decide whether you want your rules to be pairwise distinct (meaning the queries must not overlap) or ambiguous (where the first or last matching rule wins).
