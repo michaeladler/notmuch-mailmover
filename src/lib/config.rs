@@ -114,7 +114,7 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
             (true, false) => &default_cfg_path,
             (false, true) => &default_lua_path,
             (false, false) => {
-                fs::create_dir_all(basedir)?;
+                fs::create_dir_all(&basedir)?;
                 let f = File::create(&default_cfg_path)?;
                 let default_cfg: Config = Default::default();
                 serde_yaml::to_writer(f, &default_cfg)?;
@@ -126,6 +126,12 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
 
     let mut cfg = if fname.extension().map_or(false, |ext| ext == "lua") {
         let lua = Lua::new();
+        let basedir = basedir.to_string_lossy();
+        lua.load(format!(
+            "package.path = package.path .. ';{}/?.lua;{}/?/init.lua;;'",
+            basedir, basedir
+        ))
+        .exec()?;
         let val = lua.load(fname.clone()).eval()?;
         let cfg: Config = lua.from_value(val)?;
         cfg
