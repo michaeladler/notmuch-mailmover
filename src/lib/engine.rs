@@ -2,7 +2,7 @@ use std::fmt::Write as _;
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{anyhow, Result};
-use log::{debug, error, trace, warn};
+use log::{debug, error, warn};
 
 use crate::config::{Config, MatchMode};
 use crate::repo::MailRepo;
@@ -12,43 +12,10 @@ use crate::repo::MailRepo;
 /// Note that no messages are actually moved at this stage.
 pub fn apply_rules<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf, &'a str>> {
     debug!("applying rules");
-    let match_mode = cfg.rule_match_mode.unwrap_or(MatchMode::Unique);
-    match match_mode {
+    match cfg.rule_match_mode.unwrap_or(MatchMode::Unique) {
         MatchMode::Unique => apply_unique(cfg, repo),
-        MatchMode::First | MatchMode::All => {
-            let mut actions = HashMap::new();
-            for rule in &cfg.rules {
-                let mut query_str = format!("({})", &rule.query);
-                if let Some(days) = cfg.max_age_days {
-                    write!(query_str, " AND date:\"{}_days\"..", days)?;
-                }
-                let messages = repo.search_message(&query_str)?;
-                debug!("query '{}' returned {} messages", query_str, messages.len());
-                for msg in messages {
-                    let fname = msg
-                        .file_name()
-                        .and_then(|f| f.to_str())
-                        .unwrap_or("unknown");
-                    trace!("processing {}", fname);
-                    // check if message was matched previously
-                    if let Some(folder) = actions.get(&msg) {
-                        match match_mode {
-                            MatchMode::First => {
-                                debug!("Message {fname} was already assigned to folder {folder}, not moving into {}", rule.folder);
-                                continue;
-                            }
-                            MatchMode::All => {
-                                warn!("Ambiguous rule! Message {fname} was previously assigned to folder {folder}");
-                            }
-                            _ => {}
-                        }
-                    }
-                    debug!("Assigning {:?} to {}", msg, rule.folder);
-                    actions.insert(msg, rule.folder.as_str());
-                }
-            }
-            Ok(actions)
-        }
+        MatchMode::First => apply_first(cfg, repo),
+        MatchMode::All => apply_all(cfg, repo),
     }
 }
 
@@ -57,7 +24,6 @@ fn apply_unique<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<Path
     let n = cfg.rules.len();
     if n > 0 {
         let mut overlap_count: usize = 0;
-
         debug!("checking if any two rules overlap");
         let mut combined_query = String::with_capacity(2048);
         for i in 0..n - 1 {
@@ -100,6 +66,63 @@ fn apply_unique<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<Path
             if let Some(old) = actions.insert(filename, rule.folder.as_str()) {
                 return Err(anyhow!("Ambiguous rule! Message already assigned to folder {}, cannot assign to folder {}", old, rule.folder));
             }
+        }
+    }
+    Ok(actions)
+}
+
+fn apply_first<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf, &'a str>> {
+    let mut actions = HashMap::new();
+    // exclude previous rules and folders
+    let mut exclude = String::with_capacity(32768);
+    for rule in &cfg.rules {
+        let mut query_str = format!("(NOT folder:{}) AND ({})", &rule.folder, &rule.query);
+        if !exclude.is_empty() {
+            write!(query_str, " AND ({})", exclude)?;
+        }
+        if let Some(days) = cfg.max_age_days {
+            write!(query_str, " AND date:\"{}_days\"..", days)?;
+        }
+
+        let messages = repo.search_message(&query_str)?;
+        debug!("query '{}' returned {} messages", query_str, messages.len());
+        for msg in messages {
+            let fname = msg
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or("unknown");
+            debug!("assigning {} to {}", fname, rule.folder);
+            actions.insert(msg, rule.folder.as_str());
+        }
+
+        if !exclude.is_empty() {
+            write!(exclude, " AND ")?;
+        }
+        write!(exclude, "NOT ({})", rule.query)?;
+    }
+    Ok(actions)
+}
+
+fn apply_all<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf, &'a str>> {
+    let mut actions = HashMap::new();
+    for rule in &cfg.rules {
+        let mut query_str = format!("({})", &rule.query);
+        if let Some(days) = cfg.max_age_days {
+            write!(query_str, " AND date:\"{}_days\"..", days)?;
+        }
+        let messages = repo.search_message(&query_str)?;
+        debug!("query '{}' returned {} messages", query_str, messages.len());
+        for msg in messages {
+            let fname = msg
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or("unknown");
+            // check if message was matched previously
+            if let Some(folder) = actions.get(&msg) {
+                warn!("Ambiguous rule! Message {fname} was previously assigned to folder {folder}");
+            }
+            debug!("Assigning {:?} to {}", msg, rule.folder);
+            actions.insert(msg, rule.folder.as_str());
         }
     }
     Ok(actions)
@@ -212,7 +235,10 @@ mod tests {
         });
 
         let mut repo: DummyRepo = Default::default();
-        repo.add_mail("(tag:trash)".to_string(), "some.mail".to_string());
+        repo.add_mail(
+            "(NOT folder:Trash) AND (tag:trash)".to_string(),
+            "some.mail".to_string(),
+        );
         let actions = apply_rules(&cfg, &repo).unwrap();
         assert_eq!(actions.len(), 1);
         let pb = PathBuf::from_str("some.mail").unwrap();
