@@ -32,9 +32,9 @@ pub fn apply_actions(cfg: &Config, dry_run: bool, actions: &HashMap<PathBuf, &st
             dest_file.push(basename);
         };
 
-        if *src_file == dest_file {
+        if src_file.parent() == dest_file.parent() {
             trace!(
-                "skipping {} as source and destination are the same",
+                "skipping {} as message is already in the correct destination",
                 src_file.to_string_lossy()
             );
             continue;
