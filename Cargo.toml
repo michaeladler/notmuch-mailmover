@@ -44,7 +44,7 @@ flate2 = "1.0.17"
 konst = "0.3"
 
 [dev-dependencies]
-regex = "1.11.0"
+regex = "1.11.1"
 
 [features]
 vendored = ["mlua/vendored"]
