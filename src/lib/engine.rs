@@ -1,11 +1,24 @@
 use std::fmt::Write as _;
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::Path, path::PathBuf};
 
 use anyhow::{anyhow, Result};
 use log::{debug, error, warn};
 
 use crate::config::{Config, MatchMode};
 use crate::repo::MailRepo;
+
+fn filter_messages_with_prefix(messages: &[PathBuf], prefix: &PathBuf) -> Vec<PathBuf> {
+    messages
+        .iter()
+        .filter_map(|p| {
+            if p.starts_with(prefix) {
+                Some(p.clone())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
 
 /// Apply the given rules to the mails in the repository.
 /// The result is a HashMap which is assigns messages (files) to their new destination folders.
@@ -31,13 +44,32 @@ fn apply_unique<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<Path
                 let lhs = cfg.rules.get(i).unwrap();
                 let rhs = cfg.rules.get(j).unwrap();
 
+                let prefix = match (lhs.prefix.clone(), rhs.prefix.clone()) {
+                    (None, None) => None,
+                    (Some(lp), Some(rp)) => Some(if lp.starts_with(&rp) {
+                        lp
+                    } else if rp.starts_with(&lp) {
+                        rp
+                    } else {
+                        // If the two prefixes are not subwords of one another, then the queries
+                        // must match different mails so the following is unnecessary.
+                        break;
+                    }),
+                    (l, r) => l.or(r),
+                }
+                .map(|s| Path::new(&cfg.maildir).join(s));
+                debug!("prefix: {:?}", prefix);
+
                 combined_query.clear();
                 write!(combined_query, "({}) AND ({})", lhs.query, rhs.query)?;
                 if let Some(days) = cfg.max_age_days {
                     write!(combined_query, " AND date:\"{}_days\"..", days)?;
                 }
                 debug!("combined query: {}", combined_query);
-                let messages = repo.search_message(&combined_query)?;
+                let all_messages = repo.search_message(&combined_query)?;
+                let messages = prefix
+                    .map(|p| filter_messages_with_prefix(&all_messages, &p))
+                    .unwrap_or(all_messages);
                 if !messages.is_empty() {
                     let count = messages.len();
                     overlap_count += count;
@@ -60,7 +92,15 @@ fn apply_unique<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<Path
             write!(query_str, " AND date:\"{}_days\"..", days)?;
         }
         debug!("using query: {}", query_str);
-        let messages = repo.search_message(&query_str)?;
+        let all_messages = repo.search_message(&query_str)?;
+        let messages = if let Some(pre) = &rule.prefix {
+            let prefix = Path::new(&cfg.maildir).join(pre);
+            debug!("using prefix: {:?}", prefix);
+            filter_messages_with_prefix(&all_messages, &prefix)
+        } else {
+            debug!("No prefix");
+            all_messages
+        };
         for filename in messages {
             debug!("processing {:?}", filename.to_str());
             if let Some(old) = actions.insert(filename, rule.folder.as_str()) {
@@ -167,6 +207,7 @@ mod tests {
         cfg.rules.push(Rule {
             folder: "Trash".to_string(),
             query: "tag:trash".to_string(),
+            prefix: None,
         });
 
         let mut repo: DummyRepo = Default::default();
@@ -204,10 +245,12 @@ mod tests {
         cfg1.rules.push(Rule {
             folder: "Trash".to_string(),
             query: "tag:trash".to_string(),
+            prefix: None,
         });
         cfg1.rules.push(Rule {
             folder: "Deleted".to_string(),
             query: "tag:trash".to_string(),
+            prefix: None,
         });
 
         let mut cfg2 = cfg1.clone();
@@ -228,10 +271,12 @@ mod tests {
         cfg.rules.push(Rule {
             folder: "Trash".to_string(),
             query: "tag:trash".to_string(),
+            prefix: None,
         });
         cfg.rules.push(Rule {
             folder: "Deleted".to_string(),
             query: "tag:trash".to_string(),
+            prefix: None,
         });
 
         let mut repo: DummyRepo = Default::default();
@@ -253,10 +298,12 @@ mod tests {
         cfg.rules.push(Rule {
             folder: "Trash".to_string(),
             query: "tag:trash".to_string(),
+            prefix: None,
         });
         cfg.rules.push(Rule {
             folder: "Deleted".to_string(),
             query: "tag:trash".to_string(),
+            prefix: None,
         });
 
         let mut repo: DummyRepo = Default::default();
