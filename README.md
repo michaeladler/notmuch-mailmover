@@ -65,6 +65,10 @@ The configuration is largely self-explanatory, except perhaps for the choice of 
 You need to decide whether you want your rules to be pairwise distinct (meaning the queries must not overlap) or ambiguous (where the first or last matching rule wins).
 The `unique` approach is more explicit but also more verbose, while the `first` or `all` approach is more concise but may lead to unexpected behavior if you have overlapping rules, as the order of the rules matters.
 
+The `unique` match-mode also allows to disambiguate message files based on a
+prefix of their path, bypassing a limitation of `folder:` and `path:` `notmuch`
+search terms.
+
 ## Example
 
 The provided [config.yaml](./example/config.yaml) does the following:
