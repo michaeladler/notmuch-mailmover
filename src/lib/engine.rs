@@ -314,4 +314,44 @@ mod tests {
         let folder = *actions.get(&pb).unwrap();
         assert_eq!("Deleted", folder);
     }
+
+    #[test]
+    fn rules_with_prefixes() {
+        let mut cfg: Config = Default::default();
+        cfg.rule_match_mode = Some(MatchMode::Unique);
+        cfg.rules.push(Rule {
+            folder: "mailbox1/Trash".to_string(),
+            query: "tag:trash".to_string(),
+            prefix: Some("mailbox1".to_string()),
+        });
+        cfg.rules.push(Rule {
+            folder: "mailbox2/Trash".to_string(),
+            query: "tag:trash".to_string(),
+            prefix: Some("mailbox2".to_string()),
+        });
+
+        let mut repo: DummyRepo = Default::default();
+        repo.add_mail(
+            "NOT folder:\"mailbox1/Trash\" AND (tag:trash)".to_string(),
+            format!("{}/mailbox1/some.mail", cfg.maildir),
+        );
+        repo.add_mail(
+            "NOT folder:\"mailbox2/Trash\" AND (tag:trash)".to_string(),
+            format!("{}/mailbox2/some.mail", cfg.maildir),
+        );
+
+        let actions = apply_rules(&cfg, &repo).unwrap();
+        assert_eq!(actions.len(), 2);
+
+        dbg!(&actions);
+
+        let pb1 = PathBuf::from_str("~/mail/mailbox1/some.mail").unwrap();
+        let pb2 = PathBuf::from_str("~/mail/mailbox2/some.mail").unwrap();
+
+        let folder1 = *actions.get(&pb1).unwrap();
+        let folder2 = *actions.get(&pb2).unwrap();
+
+        assert_eq!("mailbox1/Trash", folder1);
+        assert_eq!("mailbox2/Trash", folder2);
+    }
 }
