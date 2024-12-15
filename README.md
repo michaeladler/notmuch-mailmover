@@ -79,6 +79,9 @@ The provided [config.yaml](./example/config.yaml) does the following:
 
 See [config_first.yaml](./example/config_first.yaml) for a different approach (using the `first` strategy for `rule_match_mode`).
 
+See [config_filter_with_prefix.yaml](./example/config_filter_with_prefix.yaml)
+for disambiguation in `unique` match-mode with prefixes.
+
 ## Similar Projects
 
 This work is inspired by [afew's Mailmover plugin](https://github.com/afewmail/afew/blob/master/afew/MailMover.py)
