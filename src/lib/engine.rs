@@ -53,7 +53,7 @@ fn apply_unique<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<Path
                     } else {
                         // If the two prefixes are not subwords of one another, then the queries
                         // must match different mails so the following is unnecessary.
-                        break;
+                        continue;
                     }),
                     (l, r) => l.or(r),
                 }
