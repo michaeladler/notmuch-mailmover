@@ -65,6 +65,10 @@ The configuration is largely self-explanatory, except perhaps for the choice of 
 You need to decide whether you want your rules to be pairwise distinct (meaning the queries must not overlap) or ambiguous (where the first or last matching rule wins).
 The `unique` approach is more explicit but also more verbose, while the `first` or `all` approach is more concise but may lead to unexpected behavior if you have overlapping rules, as the order of the rules matters.
 
+The `unique` match-mode also allows to disambiguate message files based on a
+prefix of their path, bypassing a limitation of `folder:` and `path:` `notmuch`
+search terms.
+
 ## Example
 
 The provided [config.yaml](./example/config.yaml) does the following:
@@ -74,6 +78,9 @@ The provided [config.yaml](./example/config.yaml) does the following:
 * move mails tagged as `archive` to folder `Archive`
 
 See [config_first.yaml](./example/config_first.yaml) for a different approach (using the `first` strategy for `rule_match_mode`).
+
+See [config_filter_with_prefix.yaml](./example/config_filter_with_prefix.yaml)
+for disambiguation in `unique` match-mode with prefixes.
 
 ## Similar Projects
 

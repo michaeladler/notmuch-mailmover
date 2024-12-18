@@ -87,11 +87,21 @@ impl Default for Config {
 pub struct Rule {
     pub folder: String,
     pub query: String,
+    pub prefix: Option<String>,
 }
 
 impl std::fmt::Display for Rule {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Rule {}: {}", self.folder, self.query)
+        write!(
+            f,
+            "Rule {}{}: {}",
+            self.folder,
+            self.prefix
+                .as_ref()
+                .map(|m| format!(" with prefix '{}'", m))
+                .unwrap_or_default(),
+            self.query
+        )
     }
 }
 
