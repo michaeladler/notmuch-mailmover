@@ -1,6 +1,6 @@
 [package]
 name = "notmuch-mailmover"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["Michael Adler <therisen06@gmail.com>"]
 description = "Move notmuch tagged mails into Maildir folders"
 homepage = "https://github.com/michaeladler/notmuch-mailmover"
