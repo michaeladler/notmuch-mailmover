@@ -82,6 +82,37 @@ See [config_first.yaml](./example/config_first.yaml) for a different approach (u
 See [config_filter_with_prefix.yaml](./example/config_filter_with_prefix.yaml)
 for disambiguation in `unique` match-mode with prefixes.
 
+## Caveat Utens
+
+While `notmuch-mailmover` checks if two queries match the same messages and
+refuses to proceed if rules are ambiguous, it is not idempotent, i.e. subsequent
+runs may do different things.
+
+This is noticeable with queries containing `folder:` or `path:` search terms.
+Indeed, given the following mail directory:
+```
+.
+├── left
+│   └── msg1
+└── right
+    └── msg2
+```
+
+and the following configuration:
+```
+rules:
+    - folder = right
+      query = folder:left
+    - folder = left
+      query = folder:right
+```
+
+`notmuch-mailmover` would exchange `msg1` and `msg2` on each run.
+
+It is advised that the user only use queries that aren't affected by
+`notmuch-mailmover` actions, i.e., queries without `folder:` and `path:` search
+terms.
+
 ## Similar Projects
 
 This work is inspired by [afew's Mailmover plugin](https://github.com/afewmail/afew/blob/master/afew/MailMover.py)
