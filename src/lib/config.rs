@@ -134,7 +134,7 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
     };
     debug!("loading config {:?}", fname);
 
-    let mut cfg = if fname.extension().map_or(false, |ext| ext == "lua") {
+    let mut cfg = if fname.extension().is_some_and(|ext| ext == "lua") {
         let lua = Lua::new();
         let basedir = basedir.to_string_lossy();
         lua.load(format!(
