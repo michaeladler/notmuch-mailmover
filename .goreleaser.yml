@@ -2,38 +2,35 @@ version: 2
 
 project_name: notmuch-mailmover
 
+before:
+  hooks:
+    - rustup default stable
+    - cargo install --locked cargo-zigbuild
+    - cargo fetch --locked
+
 builds:
-  - id: notmuch-mailmover
-    main: dummy.go
-    goarch:
-      - amd64
-    goos:
-      - linux
-    binary: notmuch-mailmover
-    hooks:
-      post: sh .ci/build.sh
+  - builder: rust
+    targets:
+      - x86_64-unknown-linux-gnu
+    flags:
+      - --release
+      - --features=vendored
 
 archives:
-  - id: notmuch-mailmover
-    builds:
-      - notmuch-mailmover
-    name_template: >-
+  - name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
       {{- if eq .Os "darwin" }}macOS
       {{- else if eq .Os "linux" }}Linux
       {{- else }}{{ .Os }}{{ end }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else }}{{ .Arch }}{{ end }}
-    format: tar.zst
+    formats: [ "tar.zst" ]
     files:
       - LICENSE
       - share
 
 nfpms:
-  - id: notmuch-mailmover
-    package_name: notmuch-mailmover
-    builds:
-      - notmuch-mailmover
+  - package_name: notmuch-mailmover
     formats:
       - deb
       - rpm

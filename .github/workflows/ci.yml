@@ -5,19 +5,27 @@ jobs:
     name: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0 # needed to embed version information
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - name: Install deps
+
+      - name: Install build deps
         run: sudo .ci/install-deps.sh
-      - run: cargo build --release
-      - run: cargo test --all-features
+      - uses: mlugg/setup-zig@v1
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: build --clean --snapshot
+
       - uses: actions/upload-artifact@v4
         with:
           name: notmuch-mailmover
           path: |
-            target/release/notmuch-mailmover
+            dist
 
   format:
     name: cargo fmt
