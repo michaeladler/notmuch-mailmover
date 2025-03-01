@@ -28,7 +28,7 @@ log = "0.4.25"
 notmuch = "0.8.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9.34"
-directories = "5.0.1"
+directories = "6.0.0"
 shellexpand = "3.0.0"
 clap = { version = "4.5.18", features = [ "derive", "cargo" ] }
 git-version = "0.3.9"
