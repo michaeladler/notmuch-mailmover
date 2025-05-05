@@ -22,7 +22,7 @@ codegen-units = 1
 
 [dependencies]
 uuid = { version = "1.16.0", features = ["v4"] }
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 env_logger = "0.11.8"
 log = "0.4.27"
 notmuch = "0.8.0"
