@@ -13,14 +13,15 @@
   },
   packageRules: [
     {
+      "description": "Automerge non-major updates",
       matchManagers: [ 'cargo' ],
       matchUpdateTypes: [ 'patch', 'minor' ],
-      automerge: false,
+      automerge: true,
       groupName: 'cargo-non-major',
     },
     {
       "matchManagers": ["nix"],
-      "automerge": false,
+      "automerge": true,
       "groupName": "nix",
     }
   ],
