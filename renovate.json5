@@ -8,6 +8,9 @@
     ":prConcurrentLimitNone",
     "schedule:monthly",
   ],
+  "nix": {
+    "enabled": true
+  },
   packageRules: [
     // Goals:
     // - Rollup safe upgrades to reduce CI runner load
