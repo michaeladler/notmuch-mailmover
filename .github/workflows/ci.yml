@@ -62,3 +62,12 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           files: lcov.info
+
+  nix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+      - name: Build with Nix
+        run: nix build
