@@ -12,30 +12,16 @@
     "enabled": true
   },
   packageRules: [
-    // Goals:
-    // - Rollup safe upgrades to reduce CI runner load
-    // - Have lockfile and manifest in-sync (implicit rules)
     {
-      matchManagers: [
-        'cargo',
-      ],
-      matchCurrentVersion: '>=0.1.0',
-      matchUpdateTypes: [
-        'patch',
-      ],
+      matchManagers: [ 'cargo' ],
+      matchUpdateTypes: [ 'patch', 'minor' ],
       automerge: false,
-      groupName: 'compatible',
+      groupName: 'cargo-non-major',
     },
     {
-      matchManagers: [
-        'cargo',
-      ],
-      matchCurrentVersion: '>=1.0.0',
-      matchUpdateTypes: [
-        'minor',
-      ],
-      automerge: false,
-      groupName: 'compatible',
-    },
+      "matchManagers": ["nix"],
+      "automerge": false,
+      "groupName": "nix",
+    }
   ],
 }
