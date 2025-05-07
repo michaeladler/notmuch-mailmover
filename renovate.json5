@@ -19,12 +19,13 @@
       groupName: 'cargo-non-major',
       automerge: true,
     },
-    {
-      "matchManagers": ["nix"],
-      "automerge": true,
-      "groupName": "nix",
-      "automerge": true,
-    },
+    // currently broken, see https://github.com/renovatebot/renovate/pull/33991
+    // {
+    //   "matchManagers": ["nix"],
+    //   "automerge": true,
+    //   "groupName": "nix",
+    //   "automerge": true,
+    // },
     {
       "matchCategories": ["ci"],
       "automerge": true,
