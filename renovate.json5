@@ -14,7 +14,7 @@
   packageRules: [
     {
       "description": "Automerge non-major updates",
-      matchManagers: [ 'cargo' ],
+      "matchCategories": ["rust"],
       matchUpdateTypes: [ 'patch', 'minor' ],
       automerge: true,
       groupName: 'cargo-non-major',
@@ -23,6 +23,12 @@
       "matchManagers": ["nix"],
       "automerge": true,
       "groupName": "nix",
+    },
+    {
+      "matchCategories": ["ci"],
+      "automerge": true,
+      "groupName": "ci",
+      "automerge": true,
     }
   ],
 }
