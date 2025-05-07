@@ -16,13 +16,14 @@
       "description": "Automerge non-major updates",
       "matchCategories": ["rust"],
       matchUpdateTypes: [ 'patch', 'minor' ],
-      automerge: true,
       groupName: 'cargo-non-major',
+      automerge: true,
     },
     {
       "matchManagers": ["nix"],
       "automerge": true,
       "groupName": "nix",
+      "automerge": true,
     },
     {
       "matchCategories": ["ci"],
