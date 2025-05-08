@@ -9,7 +9,7 @@
     "schedule:monthly",
   ],
   "nix": {
-    "enabled": true
+    "enabled": false
   },
   packageRules: [
     {
