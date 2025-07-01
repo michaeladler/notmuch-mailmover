@@ -61,7 +61,7 @@ impl<'de> Deserialize<'de> for MatchMode {
                     "unique" => Ok(MatchMode::Unique),
                     "first" => Ok(MatchMode::First),
                     "all" => Ok(MatchMode::All),
-                    _ => Err(E::custom(format!("unknown match mode: {}", value))),
+                    _ => Err(E::custom(format!("unknown match mode: {value}"))),
                 }
             }
         }
@@ -98,7 +98,7 @@ impl std::fmt::Display for Rule {
             self.folder,
             self.prefix
                 .as_ref()
-                .map(|m| format!(" with prefix '{}'", m))
+                .map(|m| format!(" with prefix '{m}'"))
                 .unwrap_or_default(),
             self.query
         )
@@ -132,14 +132,13 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
             }
         },
     };
-    debug!("loading config {:?}", fname);
+    debug!("loading config {fname:?}");
 
     let mut cfg = if fname.extension().is_some_and(|ext| ext == "lua") {
         let lua = Lua::new();
         let basedir = basedir.to_string_lossy();
         lua.load(format!(
-            "package.path = package.path .. ';{}/?.lua;{}/?/init.lua;;'",
-            basedir, basedir
+            "package.path = package.path .. ';{basedir}/?.lua;{basedir}/?/init.lua;;'"
         ))
         .exec()?;
         let val = lua.load(fname.clone()).eval()?;

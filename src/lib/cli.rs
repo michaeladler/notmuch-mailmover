@@ -56,6 +56,6 @@ pub enum LogLevel {
 
 impl std::fmt::Display for LogLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&format!("{:?}", self).to_ascii_lowercase())
+        f.write_str(&format!("{self:?}").to_ascii_lowercase())
     }
 }

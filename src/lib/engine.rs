@@ -58,14 +58,14 @@ fn apply_unique<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<Path
                     (l, r) => l.or(r),
                 }
                 .map(|s| Path::new(&cfg.maildir).join(s));
-                debug!("prefix: {:?}", prefix);
+                debug!("prefix: {prefix:?}");
 
                 combined_query.clear();
                 write!(combined_query, "({}) AND ({})", lhs.query, rhs.query)?;
                 if let Some(days) = cfg.max_age_days {
-                    write!(combined_query, " AND date:\"{}_days\"..", days)?;
+                    write!(combined_query, " AND date:\"{days}_days\"..")?;
                 }
-                debug!("combined query: {}", combined_query);
+                debug!("combined query: {combined_query}");
                 let all_messages = repo.search_message(&combined_query)?;
                 let messages = prefix
                     .map(|p| filter_messages_with_prefix(&all_messages, &p))
@@ -89,13 +89,13 @@ fn apply_unique<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<Path
     for rule in &cfg.rules {
         let mut query_str = format!("NOT folder:\"{}\" AND ({})", rule.folder, &rule.query);
         if let Some(days) = cfg.max_age_days {
-            write!(query_str, " AND date:\"{}_days\"..", days)?;
+            write!(query_str, " AND date:\"{days}_days\"..")?;
         }
-        debug!("using query: {}", query_str);
+        debug!("using query: {query_str}");
         let all_messages = repo.search_message(&query_str)?;
         let messages = if let Some(pre) = &rule.prefix {
             let prefix = Path::new(&cfg.maildir).join(pre);
-            debug!("using prefix: {:?}", prefix);
+            debug!("using prefix: {prefix:?}");
             filter_messages_with_prefix(&all_messages, &prefix)
         } else {
             debug!("No prefix");
@@ -118,10 +118,10 @@ fn apply_first<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<PathB
     for rule in &cfg.rules {
         let mut query_str = format!("(NOT folder:{}) AND ({})", &rule.folder, &rule.query);
         if !exclude.is_empty() {
-            write!(query_str, " AND ({})", exclude)?;
+            write!(query_str, " AND ({exclude})")?;
         }
         if let Some(days) = cfg.max_age_days {
-            write!(query_str, " AND date:\"{}_days\"..", days)?;
+            write!(query_str, " AND date:\"{days}_days\"..")?;
         }
 
         let messages = repo.search_message(&query_str)?;
@@ -148,7 +148,7 @@ fn apply_all<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf
     for rule in &cfg.rules {
         let mut query_str = format!("({})", &rule.query);
         if let Some(days) = cfg.max_age_days {
-            write!(query_str, " AND date:\"{}_days\"..", days)?;
+            write!(query_str, " AND date:\"{days}_days\"..")?;
         }
         let messages = repo.search_message(&query_str)?;
         debug!("query '{}' returned {} messages", query_str, messages.len());
@@ -171,7 +171,7 @@ fn apply_all<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf
 #[cfg(test)]
 mod tests {
 
-    use std::str::FromStr;
+    use std::{str::FromStr, vec};
 
     #[derive(Debug, Default)]
     struct DummyRepo {
@@ -189,9 +189,9 @@ mod tests {
 
     impl MailRepo for DummyRepo {
         fn search_message(&self, query: &str) -> Result<Vec<PathBuf>> {
-            debug!("[DummyRepo] searching for: {}", query);
+            debug!("[DummyRepo] searching for: {query}");
             if let Some(fnames) = self.tag2mail.get(query) {
-                debug!("[DummyRepo] returning: {:?}", fnames);
+                debug!("[DummyRepo] returning: {fnames:?}");
                 return Ok(fnames.to_vec());
             }
             Ok(Vec::new())
@@ -220,8 +220,7 @@ mod tests {
         assert_eq!(
             1,
             actions.len(),
-            "actions should have exactly one element but was: {:?}",
-            actions
+            "actions should have exactly one element but was: {actions:?}"
         );
 
         let pb = PathBuf::from_str("some.mail").unwrap();
@@ -266,18 +265,22 @@ mod tests {
 
     #[test]
     fn rule_match_mode_first_test() {
-        let mut cfg: Config = Default::default();
-        cfg.rule_match_mode = Some(MatchMode::First);
-        cfg.rules.push(Rule {
-            folder: "Trash".to_string(),
-            query: "tag:trash".to_string(),
-            prefix: None,
-        });
-        cfg.rules.push(Rule {
-            folder: "Deleted".to_string(),
-            query: "tag:trash".to_string(),
-            prefix: None,
-        });
+        let cfg = Config {
+            rule_match_mode: Some(MatchMode::First),
+            rules: vec![
+                Rule {
+                    folder: "Trash".to_string(),
+                    query: "tag:trash".to_string(),
+                    prefix: None,
+                },
+                Rule {
+                    folder: "Deleted".to_string(),
+                    query: "tag:trash".to_string(),
+                    prefix: None,
+                },
+            ],
+            ..Default::default()
+        };
 
         let mut repo: DummyRepo = Default::default();
         repo.add_mail(
@@ -293,18 +296,22 @@ mod tests {
 
     #[test]
     fn rule_match_mode_all() {
-        let mut cfg: Config = Default::default();
-        cfg.rule_match_mode = Some(MatchMode::All);
-        cfg.rules.push(Rule {
-            folder: "Trash".to_string(),
-            query: "tag:trash".to_string(),
-            prefix: None,
-        });
-        cfg.rules.push(Rule {
-            folder: "Deleted".to_string(),
-            query: "tag:trash".to_string(),
-            prefix: None,
-        });
+        let cfg = Config {
+            rule_match_mode: Some(MatchMode::All),
+            rules: vec![
+                Rule {
+                    folder: "Trash".to_string(),
+                    query: "tag:trash".to_string(),
+                    prefix: None,
+                },
+                Rule {
+                    folder: "Deleted".to_string(),
+                    query: "tag:trash".to_string(),
+                    prefix: None,
+                },
+            ],
+            ..Default::default()
+        };
 
         let mut repo: DummyRepo = Default::default();
         repo.add_mail("(tag:trash)".to_string(), "some.mail".to_string());
@@ -317,18 +324,22 @@ mod tests {
 
     #[test]
     fn rules_with_prefixes() {
-        let mut cfg: Config = Default::default();
-        cfg.rule_match_mode = Some(MatchMode::Unique);
-        cfg.rules.push(Rule {
-            folder: "mailbox1/Trash".to_string(),
-            query: "tag:trash".to_string(),
-            prefix: Some("mailbox1".to_string()),
-        });
-        cfg.rules.push(Rule {
-            folder: "mailbox2/Trash".to_string(),
-            query: "tag:trash".to_string(),
-            prefix: Some("mailbox2".to_string()),
-        });
+        let cfg = Config {
+            rule_match_mode: Some(MatchMode::Unique),
+            rules: vec![
+                Rule {
+                    folder: "mailbox1/Trash".to_string(),
+                    query: "tag:trash".to_string(),
+                    prefix: Some("mailbox1".to_string()),
+                },
+                Rule {
+                    folder: "mailbox2/Trash".to_string(),
+                    query: "tag:trash".to_string(),
+                    prefix: Some("mailbox2".to_string()),
+                },
+            ],
+            ..Default::default()
+        };
 
         let mut repo: DummyRepo = Default::default();
         repo.add_mail(

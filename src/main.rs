@@ -13,7 +13,7 @@ fn main() -> Result<()> {
     env_logger::try_init_from_env(env)?;
 
     let cfg = config::load_config(&opts.config)?;
-    debug!("successfully loaded {:?}", cfg);
+    debug!("successfully loaded {cfg:?}");
     let db_path: Option<String> = None;
 
     debug!("opening notmuch db");
@@ -31,7 +31,7 @@ fn main() -> Result<()> {
     action::apply_actions(&cfg, opts.dry_run, &actions)?;
 
     let duration = start.elapsed();
-    info!("execution took {:?}", duration);
+    info!("execution took {duration:?}");
 
     Ok(())
 }

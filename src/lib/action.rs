@@ -66,7 +66,7 @@ pub fn apply_actions(cfg: &Config, dry_run: bool, actions: &HashMap<PathBuf, &st
             );
         }
     }
-    debug!("moved {} files", counter);
+    debug!("moved {counter} files");
     Ok(())
 }
 
@@ -77,7 +77,7 @@ fn get_new_name(basename: &OsStr) -> String {
     let n = parts.len();
     if n > 1 {
         let flags = parts[n - 1];
-        write!(result, ":{}", flags).unwrap();
+        write!(result, ":{flags}").unwrap();
     }
     result
 }
