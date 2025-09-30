@@ -18,13 +18,13 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
-      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48 # v1
+      - uses: actions-rust-lang/setup-rust-toolchain@02be93da58aa71fb456aa9c43b301149248829d8 # v1
 
       - name: Install build deps
         run: sudo .ci/install-deps.sh
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           distribution: goreleaser
           version: 'latest'
