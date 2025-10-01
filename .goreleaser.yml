@@ -4,19 +4,17 @@ project_name: notmuch-mailmover
 
 builds:
   - id: notmuch-mailmover
-    main: dummy.go
-    goarch:
-      - amd64
-    goos:
-      - linux
-    binary: notmuch-mailmover
-    hooks:
-      post: sh .ci/build.sh
+    builder: rust
+    flags:
+      - --release
+      - --features=vendored
+    command: build
+    targets:
+      - x86_64-unknown-linux-gnu
 
 archives:
   - id: notmuch-mailmover
-    builds:
-      - notmuch-mailmover
+    ids: [ notmuch-mailmover ]
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
       {{- if eq .Os "darwin" }}macOS
@@ -24,7 +22,8 @@ archives:
       {{- else }}{{ .Os }}{{ end }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else }}{{ .Arch }}{{ end }}
-    format: tar.zst
+    format_overrides:
+      - formats: ['tar.zst']
     files:
       - LICENSE
       - share
@@ -32,8 +31,7 @@ archives:
 nfpms:
   - id: notmuch-mailmover
     package_name: notmuch-mailmover
-    builds:
-      - notmuch-mailmover
+    ids: [ notmuch-mailmover ]
     formats:
       - deb
       - rpm
