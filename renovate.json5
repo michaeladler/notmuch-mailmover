@@ -10,7 +10,7 @@
   ],
   lockFileMaintenance: {
     schedule: [
-      "after 9:00am and before 1:00pm every month"
+      "* 0-3 1 * *"
     ],
   },
   "nix": {
