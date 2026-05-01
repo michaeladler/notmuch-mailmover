@@ -9,6 +9,8 @@
     "schedule:monthly",
   ],
   lockFileMaintenance: {
+    enabled: true,
+    automerge: true,
     schedule: [
       "* 0-3 1 * *"
     ],
@@ -26,8 +28,8 @@
     },
     {
       "matchManagers": ["nix"],
-      "automerge": true,
       "groupName": "nix",
+      "automerge": true,
     },
     {
       "matchCategories": ["ci"],
