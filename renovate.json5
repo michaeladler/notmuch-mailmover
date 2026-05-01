@@ -14,7 +14,7 @@
     ],
   },
   "nix": {
-    "enabled": false
+    "enabled": true
   },
   packageRules: [
     {
@@ -24,13 +24,11 @@
       groupName: 'cargo-non-major',
       automerge: true,
     },
-    // currently broken, see https://github.com/renovatebot/renovate/pull/33991
-    // {
-    //   "matchManagers": ["nix"],
-    //   "automerge": true,
-    //   "groupName": "nix",
-    //   "automerge": true,
-    // },
+    {
+      "matchManagers": ["nix"],
+      "automerge": true,
+      "groupName": "nix",
+    },
     {
       "matchCategories": ["ci"],
       "automerge": true,
