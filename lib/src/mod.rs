@@ -68,7 +68,7 @@
 //! }
 //!
 //! let moves = engine::plan_moves(&cfg, &MyRepo)?;
-//! action::move_files(&cfg, false, &moves)?;
+//! action::move_files(cfg.maildir(), cfg.rename(), false, &moves)?;
 //! # Ok::<(), anyhow::Error>(())
 //! ```
 

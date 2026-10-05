@@ -31,7 +31,8 @@ fn main() -> Result<()> {
     let start = Instant::now();
 
     let moves = engine::plan_moves(&cfg, &db).context("failed to plan moves")?;
-    action::move_files(&cfg, opts.dry_run, &moves).context("failed to move files")?;
+    action::move_files(&cfg.maildir, cfg.rename, opts.dry_run, &moves)
+        .context("failed to move files")?;
 
     let duration = start.elapsed();
     info!("execution took {duration:?}");
