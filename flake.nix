@@ -6,22 +6,30 @@
   };
 
   outputs =
-    { self
-    , nixpkgs
-    , crane
-    , flake-utils
-    , ...
+    {
+      self,
+      nixpkgs,
+      crane,
+      flake-utils,
+      ...
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        inherit (pkgs) lib;
-
         craneLib = crane.mkLib pkgs;
 
-        src = craneLib.cleanCargoSource ./.;
+        src = pkgs.lib.fileset.toSource {
+          root = ./.;
+          fileset = pkgs.lib.fileset.unions [
+            ./src
+            ./lib
+            ./Cargo.toml
+            ./Cargo.lock
+            ./share
+          ];
+        };
 
         # Common arguments can be set here to avoid repeating them later
         commonArgs = {
