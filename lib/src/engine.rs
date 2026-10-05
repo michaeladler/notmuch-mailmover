@@ -25,12 +25,23 @@ fn assign<'a>(moves: &mut Moves<'a>, path: PathBuf, folder: &'a str) -> Option<&
     }
 }
 
+/// An empty result over a non-empty input usually means the prefix does not
+/// match how notmuch spells the paths, e.g. maildir is a symlink notmuch
+/// resolved. The rule would then silently no-op.
 fn filter_by_prefix(messages: &[PathBuf], prefix: &Path) -> Vec<PathBuf> {
-    messages
+    let filtered: Vec<PathBuf> = messages
         .iter()
         .filter(|p| p.starts_with(prefix))
         .cloned()
-        .collect()
+        .collect();
+    if !messages.is_empty() && filtered.is_empty() {
+        warn!(
+            "prefix {prefix:?} matched none of {} messages; \
+             check for a symlinked maildir, notmuch reports resolved paths",
+            messages.len()
+        );
+    }
+    filtered
 }
 
 /// Assigns each matching message file to its destination folder.
