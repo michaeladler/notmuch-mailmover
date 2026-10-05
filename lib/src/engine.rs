@@ -1,4 +1,8 @@
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+use std::collections::hash_map::{DefaultHasher, Entry};
 use std::fmt::Write as _;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
@@ -119,58 +123,45 @@ fn search_rule(
 
 fn plan_unique<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
     let mut moves = Moves::new();
-    let n = cfg.rules().len();
-    if n > 0 {
-        let mut overlap_count: usize = 0;
+    let rules = cfg.rules();
+    if rules.len() > 1 {
         debug!("checking if any two rules overlap");
-        let mut combined_query = String::with_capacity(2048);
-        for i in 0..n - 1 {
-            for j in i + 1..n {
-                let lhs = cfg.rules().get(i).unwrap();
-                let rhs = cfg.rules().get(j).unwrap();
-
-                // Compare as paths, not strings: filter_by_prefix() matches
-                // components, so "mailbox10" is not nested in "mailbox1" and filtering by
-                // the narrower prefix would invent overlaps.
-                // A missing prefix means the whole maildir, i.e. the empty root path that every
-                // prefix starts with.
-                let lp = lhs.prefix.as_deref().map_or(Path::new(""), Path::new);
-                let rp = rhs.prefix.as_deref().map_or(Path::new(""), Path::new);
-                let prefix = if rp.starts_with(lp) {
-                    Some(rp)
-                } else if lp.starts_with(rp) {
-                    Some(lp)
-                } else {
-                    // If the two prefixes are not subwords of one another, then the queries
-                    // must match different mails so the following is unnecessary.
-                    continue;
-                };
-                debug!("prefix: {prefix:?}");
-                let prefix = prefix
-                    .filter(|p| !p.as_os_str().is_empty())
-                    .map(|p| Path::new(cfg.maildir()).join(p));
-
-                combined_query.clear();
-                write!(combined_query, "({}) AND ({})", lhs.query, rhs.query)?;
-                if let Some(days) = cfg.max_age_days() {
-                    write!(combined_query, " AND date:\"{days}_days\"..")?;
-                }
-                debug!("combined query: {combined_query}");
-                let all_messages = repo.search_messages(&combined_query)?;
-                let messages = prefix
-                    .map(|p| filter_by_prefix(&all_messages, &p))
-                    .unwrap_or(all_messages);
-                if !messages.is_empty() {
-                    let count = messages.len();
-                    overlap_count += count;
-                    error!(
-                        "Queries '{}' and '{}' overlap ({} messages)",
-                        lhs.query, rhs.query, count
-                    );
+        // One unguarded search per rule, then intersect the results in memory. A combined
+        // query per pair would ask the DB n(n-1)/2 times for the same answer.
+        // The searches stay unguarded on purpose: a message already sitting in a
+        // destination folder still overlaps and must be reported.
+        // Prefix filtering already happened per rule, so disjoint prefixes (mailbox1
+        // vs mailbox10) yield disjoint sets without a pairwise path comparison.
+        // claimed: hash(path) -> index of the first rule that returned it. Hashing
+        // keeps the map at ~16 bytes per entry instead of the whole path, at the
+        // price of a 1-in-2^64 chance of an overlap that isn't one.
+        let mut claimed: HashMap<u64, usize> = HashMap::new();
+        // (earlier rule, later rule) -> paths both returned, logged once per pair.
+        let mut overlaps: BTreeMap<(usize, usize), usize> = BTreeMap::new();
+        for (i, rule) in rules.iter().enumerate() {
+            for path in search_rule(cfg, repo, rule, "")? {
+                let mut hasher = DefaultHasher::new();
+                path.hash(&mut hasher);
+                match claimed.entry(hasher.finish()) {
+                    // Same path twice in one result set is not a rule overlap.
+                    Entry::Occupied(e) if *e.get() != i => {
+                        *overlaps.entry((*e.get(), i)).or_default() += 1;
+                    }
+                    Entry::Occupied(_) => {}
+                    Entry::Vacant(e) => {
+                        e.insert(i);
+                    }
                 }
             }
         }
 
+        for ((i, j), count) in &overlaps {
+            error!(
+                "Queries '{}' and '{}' overlap ({} messages)",
+                rules[*i].query, rules[*j].query, count
+            );
+        }
+        let overlap_count: usize = overlaps.values().sum();
         if overlap_count > 0 {
             return Err(anyhow!("Rules overlap ({} messages)", overlap_count));
         }
@@ -324,12 +315,14 @@ pub enum MatchMode {
 #[cfg(test)]
 mod tests {
 
+    use std::cell::Cell;
     use std::collections::HashMap;
     use std::str::FromStr;
 
     #[derive(Debug, Default)]
     struct DummyRepo {
         tag2mail: HashMap<String, Vec<PathBuf>>,
+        searches: Cell<usize>,
     }
 
     impl DummyRepo {
@@ -339,10 +332,15 @@ mod tests {
                 .or_default()
                 .push(PathBuf::from_str(&fname).unwrap());
         }
+
+        pub fn search_count(&self) -> usize {
+            self.searches.get()
+        }
     }
 
     impl Repo for DummyRepo {
         fn search_messages(&self, query: &str) -> Result<Vec<PathBuf>> {
+            self.searches.set(self.searches.get() + 1);
             debug!("[DummyRepo] searching for: {query}");
             if let Some(fnames) = self.tag2mail.get(query) {
                 debug!("[DummyRepo] returning: {fnames:?}");
@@ -693,7 +691,7 @@ mod tests {
         // One mail matching both queries, but only inside the mailbox10 subtree: not a real
         // overlap, because "mailbox10" is not nested in "mailbox1".
         repo.add_mail(
-            "(tag:trash) AND (tag:trash)".to_string(),
+            "(tag:trash)".to_string(),
             "~/mail/mailbox10/some.mail".to_string(),
         );
 
@@ -733,7 +731,7 @@ mod tests {
         );
 
         repo.add_mail(
-            "(tag:trash) AND (tag:trash)".to_string(),
+            "(tag:trash)".to_string(),
             "~/mail/mailbox1/sub/some.mail".to_string(),
         );
         let err = plan_moves(&nested_prefixes, &repo).unwrap_err();
@@ -744,7 +742,7 @@ mod tests {
     fn missing_prefix_counts_as_maildir_root() {
         let mut repo: DummyRepo = Default::default();
         repo.add_mail(
-            "(tag:trash) AND (tag:trash)".to_string(),
+            "(tag:trash)".to_string(),
             "~/mail/mailbox1/some.mail".to_string(),
         );
 
@@ -766,5 +764,55 @@ mod tests {
         };
         let err = plan_moves(&cfg, &repo).unwrap_err();
         assert_eq!("Rules overlap (1 messages)", err.to_string());
+    }
+
+    #[test]
+    fn unique_mode_does_not_grow_queries_with_rule_pairs() {
+        let n = 10;
+        let cfg = TestConfig {
+            rules: (0..n)
+                .map(|i| Rule {
+                    folder: format!("folder{i}"),
+                    query: format!("tag:tag{i}"),
+                    prefix: None,
+                })
+                .collect(),
+            ..Default::default()
+        };
+
+        let mut repo: DummyRepo = Default::default();
+        for i in 0..n {
+            repo.add_mail(format!("(tag:tag{i})"), format!("~/mail/folder{i}/mail{i}"));
+        }
+        // n overlap probes + n plan queries, not n(n-1)/2 + n.
+        plan_moves(&cfg, &repo).unwrap();
+        assert_eq!(2 * n, repo.search_count());
+    }
+
+    /// A message with two files in the same folder is returned twice per query; that
+    /// is not the rule overlapping itself.
+    #[test]
+    fn duplicate_paths_in_one_result_are_not_an_overlap() {
+        let cfg = TestConfig {
+            rules: vec![
+                Rule {
+                    folder: "Trash".to_string(),
+                    query: "tag:trash".to_string(),
+                    prefix: None,
+                },
+                Rule {
+                    folder: "Deleted".to_string(),
+                    query: "tag:junk".to_string(),
+                    prefix: None,
+                },
+            ],
+            ..Default::default()
+        };
+
+        let mut repo: DummyRepo = Default::default();
+        repo.add_mail("(tag:trash)".to_string(), "~/mail/a.mail".to_string());
+        repo.add_mail("(tag:trash)".to_string(), "~/mail/a.mail".to_string());
+
+        assert!(plan_moves(&cfg, &repo).is_ok());
     }
 }
