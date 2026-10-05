@@ -1,7 +1,7 @@
 use std::fs::{self, File};
 use std::{io::BufReader, path::PathBuf};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use directories::BaseDirs;
 use log::debug;
 use mlua::{Lua, LuaSerdeExt};
@@ -53,7 +53,7 @@ impl engine::Config for Config {
 }
 
 pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
-    let bd = BaseDirs::new().unwrap();
+    let bd = BaseDirs::new().context("could not determine config directory")?;
     let basedir = bd.config_dir().join("notmuch-mailmover");
     let default_cfg_path = basedir.join("config.yaml");
     let default_lua_path = basedir.join("config.lua");
