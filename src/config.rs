@@ -52,7 +52,9 @@ impl engine::Config for Config {
     }
 }
 
-pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
+/// Loads the config from `fname`, or from the default location. If no default
+/// config exists yet, it is written there first.
+pub fn load_or_create_config(fname: &Option<PathBuf>) -> Result<Config> {
     let bd = BaseDirs::new().context("could not determine config directory")?;
     let basedir = bd.config_dir().join("notmuch-mailmover");
     let default_cfg_path = basedir.join("config.yaml");

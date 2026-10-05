@@ -15,7 +15,7 @@ fn main() -> Result<()> {
     let env = Env::default().default_filter_or(opts.log_level.to_string());
     env_logger::try_init_from_env(env)?;
 
-    let cfg = config::load_config(&opts.config)?;
+    let cfg = config::load_or_create_config(&opts.config)?;
     debug!("successfully loaded {cfg:?}");
 
     debug!("opening notmuch db");
