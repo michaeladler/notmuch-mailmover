@@ -58,8 +58,8 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
     let default_cfg_path = basedir.join("config.yaml");
     let default_lua_path = basedir.join("config.lua");
 
-    let fname: &PathBuf = match fname {
-        Some(fname) => fname,
+    let fname = match fname {
+        Some(fname) => fname.clone(),
         None => match (default_cfg_path.exists(), default_lua_path.exists()) {
             (true, true) => {
                 return Err(anyhow!(
@@ -68,14 +68,14 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
                     default_lua_path.to_string_lossy(),
                 ));
             }
-            (true, false) => &default_cfg_path,
-            (false, true) => &default_lua_path,
+            (true, false) => default_cfg_path,
+            (false, true) => default_lua_path,
             (false, false) => {
                 fs::create_dir_all(&basedir)?;
                 let f = File::create(&default_cfg_path)?;
                 let default_cfg: Config = Default::default();
                 yaml_serde::to_writer(f, &default_cfg)?;
-                &default_cfg_path
+                default_cfg_path
             }
         },
     };
