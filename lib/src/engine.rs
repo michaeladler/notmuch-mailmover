@@ -1,5 +1,5 @@
 use std::fmt::Write as _;
-use std::{collections::HashMap, path::Path, path::PathBuf};
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
 use log::{debug, error, warn};
@@ -7,8 +7,23 @@ use serde::{Deserialize, Serialize};
 
 use crate::repo::Repo;
 
-/// A message file and the destination folder it should be moved to.
-pub type Moves<'a> = HashMap<PathBuf, &'a str>;
+/// Message files and the destination folder each should be moved to, sorted by
+/// source path so a run is reproducible.
+pub type Moves<'a> = Vec<(PathBuf, &'a str)>;
+
+/// Adds `path -> folder` to `moves`, replacing an existing assignment, and
+/// returns the folder `path` had before (if any).
+// ponytail: linear scan per insert, O(n^2) over all messages. Fine for maildir
+// sizes; use a sorted Vec + binary search if a run ever exceeds ~10k messages.
+fn assign<'a>(moves: &mut Moves<'a>, path: PathBuf, folder: &'a str) -> Option<&'a str> {
+    match moves.iter_mut().find(|(p, _)| *p == path) {
+        Some((_, old)) => Some(std::mem::replace(old, folder)),
+        None => {
+            moves.push((path, folder));
+            None
+        }
+    }
+}
 
 fn filter_by_prefix(messages: &[PathBuf], prefix: &Path) -> Vec<PathBuf> {
     messages
@@ -20,10 +35,10 @@ fn filter_by_prefix(messages: &[PathBuf], prefix: &Path) -> Vec<PathBuf> {
 
 /// Assigns each matching message file to its destination folder.
 ///
-/// The result maps the message file (as returned by
-/// [`Repo::search_messages`], i.e. usually absolute) to a destination folder
-/// relative to the maildir. No file is touched; pass the result to
-/// [`crate::action::move_files`] to move them.
+/// The result pairs each message file (as returned by [`Repo::search_messages`],
+/// i.e. usually absolute) with a destination folder relative to the maildir. No
+/// file is touched; pass the result to [`crate::action::move_files`] to move
+/// them.
 ///
 /// Every query is wrapped in `NOT folder:"<folder>" AND (...)`, so messages
 /// already sitting in their destination are not returned and stay put. When
@@ -47,11 +62,13 @@ fn filter_by_prefix(messages: &[PathBuf], prefix: &Path) -> Vec<PathBuf> {
 /// overlap or assign one message to two folders.
 pub fn plan_moves<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
     debug!("planning moves");
-    match cfg.rule_match_mode() {
+    let mut moves = match cfg.rule_match_mode() {
         MatchMode::Unique => plan_unique(cfg, repo),
         MatchMode::First => plan_first(cfg, repo),
         MatchMode::All => plan_all(cfg, repo),
-    }
+    }?;
+    moves.sort_by(|(a, _), (b, _)| a.cmp(b));
+    Ok(moves)
 }
 
 /// Searches the messages of `rule`, restricted to `rule.prefix`.
@@ -90,7 +107,7 @@ fn search_rule(
 }
 
 fn plan_unique<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
-    let mut moves = HashMap::new();
+    let mut moves = Moves::new();
     let n = cfg.rules().len();
     if n > 0 {
         let mut overlap_count: usize = 0;
@@ -153,7 +170,7 @@ fn plan_unique<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
         let messages = search_rule(cfg, repo, rule, &guard)?;
         for filename in messages {
             debug!("processing {:?}", filename.to_str());
-            if let Some(old) = moves.insert(filename, rule.folder.as_str())
+            if let Some(old) = assign(&mut moves, filename, rule.folder.as_str())
                 && old != rule.folder
             {
                 let msg = format!(
@@ -169,7 +186,7 @@ fn plan_unique<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
 }
 
 fn plan_first<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
-    let mut moves = HashMap::new();
+    let mut moves = Moves::new();
     // exclude previous rules and folders
     let mut exclude = String::with_capacity(32768);
     for rule in cfg.rules() {
@@ -189,7 +206,7 @@ fn plan_first<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
                 .and_then(|f| f.to_str())
                 .unwrap_or("unknown");
             debug!("assigning {} to {}", fname, rule.folder);
-            moves.insert(msg, rule.folder.as_str());
+            assign(&mut moves, msg, rule.folder.as_str());
         }
 
         if !exclude.is_empty() {
@@ -201,7 +218,7 @@ fn plan_first<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
 }
 
 fn plan_all<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
-    let mut moves = HashMap::new();
+    let mut moves = Moves::new();
     for rule in cfg.rules() {
         // guard against the destination folder too, else every run re-picks mail already
         // moved there and, with rename, churns its UUID
@@ -212,13 +229,11 @@ fn plan_all<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
             let fname = msg
                 .file_name()
                 .and_then(|f| f.to_str())
-                .unwrap_or("unknown");
-            // check if message was matched previously
-            if let Some(folder) = moves.get(&msg) {
+                .unwrap_or("unknown")
+                .to_string();
+            if let Some(folder) = assign(&mut moves, msg, rule.folder.as_str()) {
                 warn!("Ambiguous rule! Message {fname} was previously assigned to folder {folder}");
             }
-            debug!("Assigning {:?} to {}", msg, rule.folder);
-            moves.insert(msg, rule.folder.as_str());
         }
     }
     Ok(moves)
@@ -298,6 +313,7 @@ pub enum MatchMode {
 #[cfg(test)]
 mod tests {
 
+    use std::collections::HashMap;
     use std::str::FromStr;
 
     #[derive(Debug, Default)]
@@ -326,6 +342,11 @@ mod tests {
     }
 
     use super::*;
+
+    /// Destination folder planned for `path`, if any.
+    fn folder_of<'a>(moves: &'a Moves<'a>, path: &Path) -> Option<&'a str> {
+        moves.iter().find(|(p, _)| p == path).map(|(_, f)| *f)
+    }
 
     #[derive(Clone)]
     struct TestConfig {
@@ -389,8 +410,37 @@ mod tests {
         );
 
         let pb = PathBuf::from_str("some.mail").unwrap();
-        let folder = *moves.get(&pb).unwrap();
+        let folder = folder_of(&moves, &pb).unwrap();
         assert_eq!("Trash", folder);
+    }
+
+    /// Same plan every run, whatever notmuch returns in which order.
+    #[test]
+    fn plan_is_sorted_by_message_file() {
+        let cfg = TestConfig {
+            rules: vec![Rule {
+                folder: "Trash".to_string(),
+                query: "tag:trash".to_string(),
+                prefix: None,
+            }],
+            ..Default::default()
+        };
+        let mut repo: DummyRepo = Default::default();
+        for f in ["b.mail", "a.mail", "c.mail"] {
+            repo.add_mail(
+                "NOT folder:\"Trash\" AND (tag:trash)".to_string(),
+                f.to_string(),
+            );
+        }
+
+        let moves = plan_moves(&cfg, &repo).unwrap();
+        assert_eq!(
+            vec!["a.mail", "b.mail", "c.mail"],
+            moves
+                .iter()
+                .map(|(p, _)| p.to_str().unwrap())
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
@@ -458,7 +508,7 @@ mod tests {
         let moves = plan_moves(&cfg, &repo).unwrap();
         assert_eq!(moves.len(), 1);
         let pb = PathBuf::from_str("some.mail").unwrap();
-        let folder = *moves.get(&pb).unwrap();
+        let folder = folder_of(&moves, &pb).unwrap();
         assert_eq!("Trash", folder);
     }
 
@@ -489,7 +539,7 @@ mod tests {
         let moves = plan_moves(&cfg, &repo).unwrap();
         assert_eq!(moves.len(), 1);
         let pb = PathBuf::from_str("some.mail").unwrap();
-        let folder = *moves.get(&pb).unwrap();
+        let folder = folder_of(&moves, &pb).unwrap();
         assert_eq!("Deleted", folder);
     }
 
@@ -528,8 +578,8 @@ mod tests {
         let pb1 = PathBuf::from_str("~/mail/mailbox1/some.mail").unwrap();
         let pb2 = PathBuf::from_str("~/mail/mailbox2/some.mail").unwrap();
 
-        let folder1 = *moves.get(&pb1).unwrap();
-        let folder2 = *moves.get(&pb2).unwrap();
+        let folder1 = folder_of(&moves, &pb1).unwrap();
+        let folder2 = folder_of(&moves, &pb2).unwrap();
 
         assert_eq!("mailbox1/Trash", folder1);
         assert_eq!("mailbox2/Trash", folder2);
@@ -561,14 +611,13 @@ mod tests {
         let moves = plan_moves(&cfg, &repo).unwrap();
         assert_eq!(
             vec![PathBuf::from("~/mail/INBOX/y.mail")],
-            moves.keys().cloned().collect::<Vec<_>>()
+            moves.into_iter().map(|(p, _)| p).collect::<Vec<_>>()
         );
     }
 
     #[test]
     fn same_folder_for_two_rules_is_not_ambiguous() {
         let mut cfg: TestConfig = Default::default();
-        cfg.rule_match_mode = MatchMode::Unique;
         for (folder, query) in [("Trash", "tag:trash"), ("Trash", "tag:junk")] {
             cfg.rules.push(Rule {
                 folder: folder.to_string(),
@@ -590,8 +639,8 @@ mod tests {
         let moves = plan_moves(&cfg, &repo).unwrap();
         assert_eq!(1, moves.len());
         assert_eq!(
-            Some(&"Trash"),
-            moves.get(Path::new("trash.mail")),
+            Some("Trash"),
+            folder_of(&moves, Path::new("trash.mail")),
             "same destination from both rules is not ambiguous"
         );
     }
@@ -623,7 +672,7 @@ mod tests {
                 moves.len(),
                 "{mode:?} must return only the mail under the prefix: {moves:?}"
             );
-            assert!(moves.contains_key(Path::new("~/mail/mailbox1/some.mail")));
+            assert!(folder_of(&moves, Path::new("~/mail/mailbox1/some.mail")).is_some());
         }
     }
 

@@ -112,14 +112,11 @@ fn new_name(basename: &OsStr) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use super::*;
 
     #[test]
     fn bare_filename_is_an_error_not_a_panic() {
-        let mut moves = HashMap::new();
-        moves.insert(PathBuf::from("some.mail"), "Trash");
+        let moves = Moves::from([(PathBuf::from("some.mail"), "Trash")]);
         let err = move_files("/tmp/mail", false, false, &moves).unwrap_err();
         assert_eq!("Failed to get mailbox name from some.mail", err.to_string());
     }
@@ -135,8 +132,7 @@ mod tests {
         let src = nested.join("1234.mail:2,S");
         fs::write(&src, "mail").unwrap();
 
-        let mut moves = HashMap::new();
-        moves.insert(src.clone(), "INBOX");
+        let moves = Moves::from([(src.clone(), "INBOX")]);
         move_files(&maildir.to_string_lossy(), true, false, &moves).unwrap();
 
         assert!(!src.exists(), "old name must be gone");
@@ -158,8 +154,7 @@ mod tests {
         let src = src_dir.join("1234.mail:2,S");
         fs::write(&src, "mail").unwrap();
 
-        let mut moves = HashMap::new();
-        moves.insert(src, "Archive/2026");
+        let moves = Moves::from([(src, "Archive/2026")]);
         move_files(&maildir.to_string_lossy(), false, false, &moves).unwrap();
 
         assert!(maildir.join("Archive/2026/INBOX").is_dir());
