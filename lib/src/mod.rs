@@ -43,8 +43,8 @@
 //!     fn rules(&self) -> &[Rule] {
 //!         &self.rules
 //!     }
-//!     fn rule_match_mode(&self) -> Option<MatchMode> {
-//!         None
+//!     fn rule_match_mode(&self) -> MatchMode {
+//!         MatchMode::Unique
 //!     }
 //! }
 //!

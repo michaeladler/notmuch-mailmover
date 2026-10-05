@@ -18,7 +18,7 @@ pub struct Config {
     pub rename: bool,
     pub max_age_days: Option<u32>,
     pub rules: Vec<Rule>,
-    pub rule_match_mode: Option<MatchMode>,
+    pub rule_match_mode: MatchMode,
 }
 
 impl Default for Config {
@@ -29,7 +29,7 @@ impl Default for Config {
             rename: false,
             max_age_days: None,
             rules: Vec::new(),
-            rule_match_mode: None,
+            rule_match_mode: MatchMode::Unique,
         }
     }
 }
@@ -47,7 +47,7 @@ impl engine::Config for Config {
     fn rules(&self) -> &[Rule] {
         &self.rules
     }
-    fn rule_match_mode(&self) -> Option<MatchMode> {
+    fn rule_match_mode(&self) -> MatchMode {
         self.rule_match_mode
     }
 }

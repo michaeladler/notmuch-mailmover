@@ -136,8 +136,8 @@ mod tests {
         fn rules(&self) -> &[Rule] {
             &[]
         }
-        fn rule_match_mode(&self) -> Option<MatchMode> {
-            None
+        fn rule_match_mode(&self) -> MatchMode {
+            MatchMode::Unique
         }
     }
 

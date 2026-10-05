@@ -47,7 +47,7 @@ fn filter_by_prefix(messages: &[PathBuf], prefix: &Path) -> Vec<PathBuf> {
 /// overlap or assign one message to two folders.
 pub fn plan_moves<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
     debug!("planning moves");
-    match cfg.rule_match_mode().unwrap_or(MatchMode::Unique) {
+    match cfg.rule_match_mode() {
         MatchMode::Unique => plan_unique(cfg, repo),
         MatchMode::First => plan_first(cfg, repo),
         MatchMode::All => plan_all(cfg, repo),
@@ -245,8 +245,8 @@ pub trait Config {
     /// The rules to apply, in the order they are evaluated.
     fn rules(&self) -> &[Rule];
 
-    /// Which overlap strategy to use. `None` means [`MatchMode::Unique`].
-    fn rule_match_mode(&self) -> Option<MatchMode>;
+    /// Which overlap strategy to use. Defaults to [`MatchMode::Unique`].
+    fn rule_match_mode(&self) -> MatchMode;
 }
 
 /// A single "move messages matching `query` into `folder`" rule.
@@ -281,11 +281,12 @@ impl std::fmt::Display for Rule {
 }
 
 /// How to resolve messages matched by more than one rule.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum MatchMode {
     /// Rules must be pairwise disjoint; ambiguous rules are an error.
     /// Explicit, but requires verbose queries.
+    #[default]
     Unique,
     /// First matching rule wins; rule order is significant.
     First,
@@ -332,7 +333,7 @@ mod tests {
         rename: bool,
         max_age_days: Option<u32>,
         rules: Vec<Rule>,
-        rule_match_mode: Option<MatchMode>,
+        rule_match_mode: MatchMode,
     }
 
     impl Default for TestConfig {
@@ -342,7 +343,7 @@ mod tests {
                 rename: false,
                 max_age_days: None,
                 rules: Vec::new(),
-                rule_match_mode: None,
+                rule_match_mode: MatchMode::Unique,
             }
         }
     }
@@ -360,7 +361,7 @@ mod tests {
         fn rules(&self) -> &[Rule] {
             &self.rules
         }
-        fn rule_match_mode(&self) -> Option<MatchMode> {
+        fn rule_match_mode(&self) -> MatchMode {
             self.rule_match_mode
         }
     }
@@ -417,7 +418,7 @@ mod tests {
         });
 
         let mut cfg2 = cfg1.clone();
-        cfg2.rule_match_mode = Some(MatchMode::Unique);
+        cfg2.rule_match_mode = MatchMode::Unique;
 
         for cfg in &[cfg1, cfg2] {
             let moves = plan_moves(cfg, &repo);
@@ -433,7 +434,7 @@ mod tests {
     #[test]
     fn rule_match_mode_first_test() {
         let cfg = TestConfig {
-            rule_match_mode: Some(MatchMode::First),
+            rule_match_mode: MatchMode::First,
             rules: vec![
                 Rule {
                     folder: "Trash".to_string(),
@@ -464,7 +465,7 @@ mod tests {
     #[test]
     fn rule_match_mode_all() {
         let cfg = TestConfig {
-            rule_match_mode: Some(MatchMode::All),
+            rule_match_mode: MatchMode::All,
             rules: vec![
                 Rule {
                     folder: "Trash".to_string(),
@@ -495,7 +496,7 @@ mod tests {
     #[test]
     fn rules_with_prefixes() {
         let cfg = TestConfig {
-            rule_match_mode: Some(MatchMode::Unique),
+            rule_match_mode: MatchMode::Unique,
             rules: vec![
                 Rule {
                     folder: "mailbox1/Trash".to_string(),
@@ -539,7 +540,7 @@ mod tests {
     #[test]
     fn all_mode_skips_mail_already_in_destination() {
         let cfg = TestConfig {
-            rule_match_mode: Some(MatchMode::All),
+            rule_match_mode: MatchMode::All,
             rules: vec![Rule {
                 folder: "Trash".to_string(),
                 query: "tag:trash".to_string(),
@@ -567,7 +568,7 @@ mod tests {
     #[test]
     fn same_folder_for_two_rules_is_not_ambiguous() {
         let mut cfg: TestConfig = Default::default();
-        cfg.rule_match_mode = Some(MatchMode::Unique);
+        cfg.rule_match_mode = MatchMode::Unique;
         for (folder, query) in [("Trash", "tag:trash"), ("Trash", "tag:junk")] {
             cfg.rules.push(Rule {
                 folder: folder.to_string(),
@@ -599,7 +600,7 @@ mod tests {
     fn prefix_is_honored_in_first_and_all_mode() {
         for mode in [MatchMode::First, MatchMode::All] {
             let cfg = TestConfig {
-                rule_match_mode: Some(mode),
+                rule_match_mode: mode,
                 rules: vec![Rule {
                     folder: "mailbox1/Trash".to_string(),
                     query: "tag:trash".to_string(),
@@ -637,7 +638,7 @@ mod tests {
         );
 
         let sibling_prefixes = TestConfig {
-            rule_match_mode: Some(MatchMode::Unique),
+            rule_match_mode: MatchMode::Unique,
             rules: vec![
                 Rule {
                     folder: "mailbox1/Trash".to_string(),
@@ -688,7 +689,7 @@ mod tests {
         );
 
         let cfg = TestConfig {
-            rule_match_mode: Some(MatchMode::Unique),
+            rule_match_mode: MatchMode::Unique,
             rules: vec![
                 Rule {
                     folder: "Trash".to_string(),
