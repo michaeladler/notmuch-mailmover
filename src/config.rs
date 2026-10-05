@@ -83,9 +83,13 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
 
     let mut cfg = if fname.extension().is_some_and(|ext| ext == "lua") {
         let lua = Lua::new();
-        let basedir = basedir.to_string_lossy();
+        let moduledir = fname
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(&basedir)
+            .to_string_lossy();
         lua.load(format!(
-            "package.path = package.path .. ';{basedir}/?.lua;{basedir}/?/init.lua;;'"
+            "package.path = package.path .. ';{moduledir}/?.lua;{moduledir}/?/init.lua;;'"
         ))
         .exec()?;
         let val = lua.load(fname.clone()).eval()?;
