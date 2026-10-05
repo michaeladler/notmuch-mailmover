@@ -1,4 +1,3 @@
-use core::str;
 use std::path::PathBuf;
 
 use clap::{crate_authors, Parser, ValueEnum};
