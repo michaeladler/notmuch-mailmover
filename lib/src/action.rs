@@ -2,9 +2,10 @@ use std::ffi::OsStr;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use log::{debug, info, trace, warn};
-use uuid::Uuid;
 
 use crate::engine::Moves;
 use crate::{Error, Result};
@@ -94,7 +95,15 @@ pub fn move_files(maildir: &str, rename: bool, dry_run: bool, moves: &Moves) -> 
 
 /// Construct a new filename, composed of a made-up ID and the flags part of the original filename.
 fn new_name(basename: &OsStr) -> String {
-    let mut result = Uuid::new_v4().to_string();
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    let mut result = format!(
+        "{nanos:x}.{}.{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    );
     let basename = basename.to_string_lossy();
     let parts: Vec<&str> = basename.split(':').collect();
     let n = parts.len();
@@ -108,6 +117,16 @@ fn new_name(basename: &OsStr) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The made-up ID part of a generated name must be `{nanos:x}.{pid}.{counter}`.
+    fn is_id(s: &str) -> bool {
+        let parts: Vec<&str> = s.split('.').collect();
+        parts.len() == 3
+            && !parts[0].is_empty()
+            && parts[0].chars().all(|c| c.is_ascii_hexdigit())
+            && parts[1].parse::<u32>().is_ok()
+            && parts[2].parse::<u64>().is_ok()
+    }
 
     #[test]
     fn bare_filename_is_an_error_not_a_panic() {
@@ -137,7 +156,7 @@ mod tests {
             .collect();
         assert_eq!(1, names.len());
         assert!(names[0].ends_with(":2,S"), "flags kept: {}", names[0]);
-        assert!(Uuid::parse_str(names[0].split(':').next().unwrap()).is_ok());
+        assert!(is_id(names[0].split(':').next().unwrap()));
     }
 
     #[test]
@@ -168,16 +187,23 @@ mod tests {
         }
     }
 
+    /// Names must never collide, even within one run and one nanosecond.
+    #[test]
+    fn new_name_is_unique() {
+        let names: std::collections::HashSet<String> = (0..10_000)
+            .map(|_| new_name(OsStr::new("1234.mail:2,S")))
+            .collect();
+        assert_eq!(10_000, names.len());
+    }
+
     #[test]
     fn new_name_test() {
-        let is_uuid = |s: &str| Uuid::parse_str(s).is_ok();
-
         {
             let fname = new_name(OsStr::new(
                 "1662362645_0.322365.foo,U=55582,FMD5=7e33429f656f1e6e9d79b29c3f82c57e:2,S",
             ));
             let parts: Vec<&str> = fname.split(':').collect();
-            assert!(is_uuid(parts[0]));
+            assert!(is_id(parts[0]));
             assert_eq!("2,S", parts[1]);
             assert_eq!(2, parts.len());
         }
@@ -187,7 +213,7 @@ mod tests {
                 "1662103908_2.328294.foo,U=55119,FMD5=7e33429f656f1e6e9d79b29c3f82c57e:2,RS",
             ));
             let parts: Vec<&str> = fname.split(':').collect();
-            assert!(is_uuid(parts[0]));
+            assert!(is_id(parts[0]));
             assert_eq!("2,RS", parts[1]);
             assert_eq!(2, parts.len());
         }
@@ -197,7 +223,7 @@ mod tests {
                 "1662103908_2.328294.foo,U=55119,FMD5=7e33429f656f1e6e9d79b29c3f82c57e:",
             ));
             let parts: Vec<&str> = fname.split(':').collect();
-            assert!(is_uuid(parts[0]));
+            assert!(is_id(parts[0]));
             assert_eq!("", parts[1]);
             assert_eq!(2, parts.len());
         }
@@ -207,7 +233,7 @@ mod tests {
                 "1662103908_2.328294.foo,U=55119,FMD5=7e33429f656f1e6e9d79b29c3f82c57e",
             ));
             let parts: Vec<&str> = fname.split(':').collect();
-            assert!(is_uuid(parts[0]));
+            assert!(is_id(parts[0]));
             assert_eq!(1, parts.len());
         }
     }
