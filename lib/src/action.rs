@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fmt::Write as _;
 use std::fs;
@@ -8,11 +7,11 @@ use anyhow::{Result, anyhow};
 use log::{debug, info, trace, warn};
 use uuid::Uuid;
 
-use crate::engine::Config;
+use crate::engine::{Config, Moves};
 
-/// Moves the files collected by [`crate::engine::apply_rules`].
+/// Moves the files collected by [`crate::engine::plan_moves`].
 ///
-/// `actions` maps a message file to a destination folder relative to
+/// `moves` maps a message file to a destination folder relative to
 /// [`Config::maildir`]. Each file is moved to `<maildir>/<folder>/<mailbox>`,
 /// where `<mailbox>` is the file's current parent directory name, so nested
 /// mailboxes keep their subtree. With [`Config::rename`] set, the file gets a
@@ -29,20 +28,16 @@ use crate::engine::Config;
 /// Returns an error if a path has no file or mailbox component, or if creating
 /// the destination directory or renaming a file fails. Moves performed before
 /// the failure are kept.
-pub fn apply_actions(
-    cfg: &impl Config,
-    dry_run: bool,
-    actions: &HashMap<PathBuf, &str>,
-) -> Result<()> {
-    if actions.is_empty() {
+pub fn move_files(cfg: &impl Config, dry_run: bool, moves: &Moves) -> Result<()> {
+    if moves.is_empty() {
         info!("nothing to do");
         return Ok(());
     }
 
-    debug!("applying {} actions", actions.len());
+    debug!("applying {} moves", moves.len());
 
     let mut counter: usize = 0;
-    for (src_file, folder) in actions {
+    for (src_file, folder) in moves {
         let basename = src_file
             .file_name()
             .ok_or_else(|| anyhow!("Failed to get filename from {}", src_file.to_string_lossy()))?;
@@ -58,10 +53,10 @@ pub fn apply_actions(
                 )
             })?;
 
-        let db_path = PathBuf::from(cfg.maildir());
-        let mut dest_file = db_path.join(folder).join(mailbox);
+        let maildir = PathBuf::from(cfg.maildir());
+        let mut dest_file = maildir.join(folder).join(mailbox);
         if cfg.rename() {
-            dest_file.push(get_new_name(basename));
+            dest_file.push(new_name(basename));
         } else {
             dest_file.push(basename);
         };
@@ -104,7 +99,7 @@ pub fn apply_actions(
 }
 
 /// Construct a new filename, composed of a made-up ID and the flags part of the original filename.
-fn get_new_name(basename: &OsStr) -> String {
+fn new_name(basename: &OsStr) -> String {
     let mut result = Uuid::new_v4().to_string();
     let basename = basename.to_string_lossy();
     let parts: Vec<&str> = basename.split(':').collect();
@@ -118,6 +113,8 @@ fn get_new_name(basename: &OsStr) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::engine::{MatchMode, Rule};
 
@@ -150,9 +147,9 @@ mod tests {
             maildir: "/tmp/mail".to_string(),
             rename: false,
         };
-        let mut actions = HashMap::new();
-        actions.insert(PathBuf::from("some.mail"), "Trash");
-        let err = apply_actions(&cfg, false, &actions).unwrap_err();
+        let mut moves = HashMap::new();
+        moves.insert(PathBuf::from("some.mail"), "Trash");
+        let err = move_files(&cfg, false, &moves).unwrap_err();
         assert_eq!("Failed to get mailbox name from some.mail", err.to_string());
     }
 
@@ -171,9 +168,9 @@ mod tests {
             maildir: maildir.to_string_lossy().into_owned(),
             rename: true,
         };
-        let mut actions = HashMap::new();
-        actions.insert(src.clone(), "INBOX");
-        apply_actions(&cfg, false, &actions).unwrap();
+        let mut moves = HashMap::new();
+        moves.insert(src.clone(), "INBOX");
+        move_files(&cfg, false, &moves).unwrap();
 
         assert!(!src.exists(), "old name must be gone");
         let names: Vec<_> = fs::read_dir(&nested)
@@ -198,20 +195,20 @@ mod tests {
             maildir: maildir.to_string_lossy().into_owned(),
             rename: false,
         };
-        let mut actions = HashMap::new();
-        actions.insert(src, "Archive/2026");
-        apply_actions(&cfg, false, &actions).unwrap();
+        let mut moves = HashMap::new();
+        moves.insert(src, "Archive/2026");
+        move_files(&cfg, false, &moves).unwrap();
 
         assert!(maildir.join("Archive/2026/INBOX").is_dir());
     }
 
     #[test]
-    fn get_new_name_handles_non_utf8_basename() {
+    fn new_name_handles_non_utf8_basename() {
         #[cfg(unix)]
         {
             use std::os::unix::ffi::OsStrExt;
             let basename = OsStr::from_bytes(b"1234.mail\xff:2,S");
-            let new_name = get_new_name(basename);
+            let new_name = new_name(basename);
             let parts: Vec<&str> = new_name.split(':').collect();
             assert_eq!(2, parts.len());
             assert_eq!("2,S", parts[1]);
@@ -219,11 +216,11 @@ mod tests {
     }
 
     #[test]
-    fn get_new_name_test() {
+    fn new_name_test() {
         let is_uuid = |s: &str| Uuid::parse_str(s).is_ok();
 
         {
-            let fname = get_new_name(OsStr::new(
+            let fname = new_name(OsStr::new(
                 "1662362645_0.322365.foo,U=55582,FMD5=7e33429f656f1e6e9d79b29c3f82c57e:2,S",
             ));
             let parts: Vec<&str> = fname.split(':').collect();
@@ -233,7 +230,7 @@ mod tests {
         }
 
         {
-            let fname = get_new_name(OsStr::new(
+            let fname = new_name(OsStr::new(
                 "1662103908_2.328294.foo,U=55119,FMD5=7e33429f656f1e6e9d79b29c3f82c57e:2,RS",
             ));
             let parts: Vec<&str> = fname.split(':').collect();
@@ -243,7 +240,7 @@ mod tests {
         }
 
         {
-            let fname = get_new_name(OsStr::new(
+            let fname = new_name(OsStr::new(
                 "1662103908_2.328294.foo,U=55119,FMD5=7e33429f656f1e6e9d79b29c3f82c57e:",
             ));
             let parts: Vec<&str> = fname.split(':').collect();
@@ -253,7 +250,7 @@ mod tests {
         }
 
         {
-            let fname = get_new_name(OsStr::new(
+            let fname = new_name(OsStr::new(
                 "1662103908_2.328294.foo,U=55119,FMD5=7e33429f656f1e6e9d79b29c3f82c57e",
             ));
             let parts: Vec<&str> = fname.split(':').collect();

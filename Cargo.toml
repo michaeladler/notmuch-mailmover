@@ -4,7 +4,7 @@ members = ["lib"]
 
 [package]
 name = "notmuch-mailmover"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Michael Adler <therisen06@gmail.com>"]
 description = "Move notmuch tagged mails into Maildir folders"
 homepage = "https://github.com/michaeladler/notmuch-mailmover"
@@ -21,7 +21,7 @@ panic = "abort"
 codegen-units = 1
 
 [dependencies]
-notmuch-mailmover-lib = { version = "0.7.0", path = "lib" }
+notmuch-mailmover-lib = { version = "0.8.0", path = "lib" }
 anyhow = "1.0.98"
 env_logger = "0.11.8"
 log = "0.4.27"

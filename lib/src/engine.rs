@@ -5,27 +5,25 @@ use anyhow::{Result, anyhow};
 use log::{debug, error, warn};
 use serde::{Deserialize, Serialize};
 
-use crate::repo::MailRepo;
+use crate::repo::Repo;
 
-fn filter_messages_with_prefix(messages: &[PathBuf], prefix: &PathBuf) -> Vec<PathBuf> {
+/// A message file and the destination folder it should be moved to.
+pub type Moves<'a> = HashMap<PathBuf, &'a str>;
+
+fn filter_by_prefix(messages: &[PathBuf], prefix: &Path) -> Vec<PathBuf> {
     messages
         .iter()
-        .filter_map(|p| {
-            if p.starts_with(prefix) {
-                Some(p.clone())
-            } else {
-                None
-            }
-        })
+        .filter(|p| p.starts_with(prefix))
+        .cloned()
         .collect()
 }
 
 /// Assigns each matching message file to its destination folder.
 ///
 /// The result maps the message file (as returned by
-/// [`MailRepo::search_message`], i.e. usually absolute) to a destination folder
+/// [`Repo::search_messages`], i.e. usually absolute) to a destination folder
 /// relative to the maildir. No file is touched; pass the result to
-/// [`crate::action::apply_actions`] to move them.
+/// [`crate::action::move_files`] to move them.
 ///
 /// Every query is wrapped in `NOT folder:"<folder>" AND (...)`, so messages
 /// already sitting in their destination are not returned and stay put. When
@@ -47,23 +45,17 @@ fn filter_messages_with_prefix(messages: &[PathBuf], prefix: &PathBuf) -> Vec<Pa
 ///
 /// Returns an error if a query fails, or (in [`MatchMode::Unique`]) if two rules
 /// overlap or assign one message to two folders.
-pub fn apply_rules<'a>(
-    cfg: &'a impl Config,
-    repo: &dyn MailRepo,
-) -> Result<HashMap<PathBuf, &'a str>> {
-    debug!("applying rules");
+pub fn plan_moves<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
+    debug!("planning moves");
     match cfg.rule_match_mode().unwrap_or(MatchMode::Unique) {
-        MatchMode::Unique => apply_unique(cfg, repo),
-        MatchMode::First => apply_first(cfg, repo),
-        MatchMode::All => apply_all(cfg, repo),
+        MatchMode::Unique => plan_unique(cfg, repo),
+        MatchMode::First => plan_first(cfg, repo),
+        MatchMode::All => plan_all(cfg, repo),
     }
 }
 
-fn apply_unique<'a>(
-    cfg: &'a impl Config,
-    repo: &dyn MailRepo,
-) -> Result<HashMap<PathBuf, &'a str>> {
-    let mut actions = HashMap::new();
+fn plan_unique<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
+    let mut moves = HashMap::new();
     let n = cfg.rules().len();
     if n > 0 {
         let mut overlap_count: usize = 0;
@@ -74,7 +66,7 @@ fn apply_unique<'a>(
                 let lhs = cfg.rules().get(i).unwrap();
                 let rhs = cfg.rules().get(j).unwrap();
 
-                // Compare as paths, not strings: filter_messages_with_prefix() matches
+                // Compare as paths, not strings: filter_by_prefix() matches
                 // components, so "mailbox10" is not nested in "mailbox1" and filtering by
                 // the narrower prefix would invent overlaps.
                 // A missing prefix means the whole maildir, i.e. the empty root path that every
@@ -101,9 +93,9 @@ fn apply_unique<'a>(
                     write!(combined_query, " AND date:\"{days}_days\"..")?;
                 }
                 debug!("combined query: {combined_query}");
-                let all_messages = repo.search_message(&combined_query)?;
+                let all_messages = repo.search_messages(&combined_query)?;
                 let messages = prefix
-                    .map(|p| filter_messages_with_prefix(&all_messages, &p))
+                    .map(|p| filter_by_prefix(&all_messages, &p))
                     .unwrap_or(all_messages);
                 if !messages.is_empty() {
                     let count = messages.len();
@@ -127,18 +119,18 @@ fn apply_unique<'a>(
             write!(query_str, " AND date:\"{days}_days\"..")?;
         }
         debug!("using query: {query_str}");
-        let all_messages = repo.search_message(&query_str)?;
+        let all_messages = repo.search_messages(&query_str)?;
         let messages = if let Some(pre) = &rule.prefix {
             let prefix = Path::new(cfg.maildir()).join(pre);
             debug!("using prefix: {prefix:?}");
-            filter_messages_with_prefix(&all_messages, &prefix)
+            filter_by_prefix(&all_messages, &prefix)
         } else {
             debug!("No prefix");
             all_messages
         };
         for filename in messages {
             debug!("processing {:?}", filename.to_str());
-            if let Some(old) = actions.insert(filename, rule.folder.as_str()) {
+            if let Some(old) = moves.insert(filename, rule.folder.as_str()) {
                 let msg = format!(
                     "Ambiguous rule! Message already assigned to folder {old}, \
                      cannot assign to folder {}",
@@ -148,11 +140,11 @@ fn apply_unique<'a>(
             }
         }
     }
-    Ok(actions)
+    Ok(moves)
 }
 
-fn apply_first<'a>(cfg: &'a impl Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf, &'a str>> {
-    let mut actions = HashMap::new();
+fn plan_first<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
+    let mut moves = HashMap::new();
     // exclude previous rules and folders
     let mut exclude = String::with_capacity(32768);
     for rule in cfg.rules() {
@@ -164,7 +156,7 @@ fn apply_first<'a>(cfg: &'a impl Config, repo: &dyn MailRepo) -> Result<HashMap<
             write!(query_str, " AND date:\"{days}_days\"..")?;
         }
 
-        let messages = repo.search_message(&query_str)?;
+        let messages = repo.search_messages(&query_str)?;
         debug!("query '{}' returned {} messages", query_str, messages.len());
         for msg in messages {
             let fname = msg
@@ -172,7 +164,7 @@ fn apply_first<'a>(cfg: &'a impl Config, repo: &dyn MailRepo) -> Result<HashMap<
                 .and_then(|f| f.to_str())
                 .unwrap_or("unknown");
             debug!("assigning {} to {}", fname, rule.folder);
-            actions.insert(msg, rule.folder.as_str());
+            moves.insert(msg, rule.folder.as_str());
         }
 
         if !exclude.is_empty() {
@@ -180,17 +172,17 @@ fn apply_first<'a>(cfg: &'a impl Config, repo: &dyn MailRepo) -> Result<HashMap<
         }
         write!(exclude, "NOT ({})", rule.query)?;
     }
-    Ok(actions)
+    Ok(moves)
 }
 
-fn apply_all<'a>(cfg: &'a impl Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf, &'a str>> {
-    let mut actions = HashMap::new();
+fn plan_all<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
+    let mut moves = HashMap::new();
     for rule in cfg.rules() {
         let mut query_str = format!("({})", rule.query);
         if let Some(days) = cfg.max_age_days() {
             write!(query_str, " AND date:\"{days}_days\"..")?;
         }
-        let messages = repo.search_message(&query_str)?;
+        let messages = repo.search_messages(&query_str)?;
         debug!("query '{}' returned {} messages", query_str, messages.len());
         for msg in messages {
             let fname = msg
@@ -198,14 +190,14 @@ fn apply_all<'a>(cfg: &'a impl Config, repo: &dyn MailRepo) -> Result<HashMap<Pa
                 .and_then(|f| f.to_str())
                 .unwrap_or("unknown");
             // check if message was matched previously
-            if let Some(folder) = actions.get(&msg) {
+            if let Some(folder) = moves.get(&msg) {
                 warn!("Ambiguous rule! Message {fname} was previously assigned to folder {folder}");
             }
             debug!("Assigning {:?} to {}", msg, rule.folder);
-            actions.insert(msg, rule.folder.as_str());
+            moves.insert(msg, rule.folder.as_str());
         }
     }
-    Ok(actions)
+    Ok(moves)
 }
 
 /// Input contract for the rule engine and the file mover.
@@ -297,8 +289,8 @@ mod tests {
         }
     }
 
-    impl MailRepo for DummyRepo {
-        fn search_message(&self, query: &str) -> Result<Vec<PathBuf>> {
+    impl Repo for DummyRepo {
+        fn search_messages(&self, query: &str) -> Result<Vec<PathBuf>> {
             debug!("[DummyRepo] searching for: {query}");
             if let Some(fnames) = self.tag2mail.get(query) {
                 debug!("[DummyRepo] returning: {fnames:?}");
@@ -364,15 +356,15 @@ mod tests {
             "some.mail".to_string(),
         );
 
-        let actions = apply_rules(&cfg, &repo).unwrap();
+        let moves = plan_moves(&cfg, &repo).unwrap();
         assert_eq!(
             1,
-            actions.len(),
-            "actions should have exactly one element but was: {actions:?}"
+            moves.len(),
+            "moves should have exactly one element but was: {moves:?}"
         );
 
         let pb = PathBuf::from_str("some.mail").unwrap();
-        let folder = *actions.get(&pb).unwrap();
+        let folder = *moves.get(&pb).unwrap();
         assert_eq!("Trash", folder);
     }
 
@@ -404,9 +396,9 @@ mod tests {
         cfg2.rule_match_mode = Some(MatchMode::Unique);
 
         for cfg in &[cfg1, cfg2] {
-            let actions = apply_rules(cfg, &repo);
-            assert!(actions.is_err());
-            let err = actions.unwrap_err();
+            let moves = plan_moves(cfg, &repo);
+            assert!(moves.is_err());
+            let err = moves.unwrap_err();
             assert_eq!(
                 "Ambiguous rule! Message already assigned to folder Trash, cannot assign to folder Deleted",
                 err.to_string()
@@ -438,10 +430,10 @@ mod tests {
             "(NOT folder:\"Trash\") AND (tag:trash)".to_string(),
             "some.mail".to_string(),
         );
-        let actions = apply_rules(&cfg, &repo).unwrap();
-        assert_eq!(actions.len(), 1);
+        let moves = plan_moves(&cfg, &repo).unwrap();
+        assert_eq!(moves.len(), 1);
         let pb = PathBuf::from_str("some.mail").unwrap();
-        let folder = *actions.get(&pb).unwrap();
+        let folder = *moves.get(&pb).unwrap();
         assert_eq!("Trash", folder);
     }
 
@@ -466,10 +458,10 @@ mod tests {
 
         let mut repo: DummyRepo = Default::default();
         repo.add_mail("(tag:trash)".to_string(), "some.mail".to_string());
-        let actions = apply_rules(&cfg, &repo).unwrap();
-        assert_eq!(actions.len(), 1);
+        let moves = plan_moves(&cfg, &repo).unwrap();
+        assert_eq!(moves.len(), 1);
         let pb = PathBuf::from_str("some.mail").unwrap();
-        let folder = *actions.get(&pb).unwrap();
+        let folder = *moves.get(&pb).unwrap();
         assert_eq!("Deleted", folder);
     }
 
@@ -502,14 +494,14 @@ mod tests {
             format!("{}/mailbox2/some.mail", cfg.maildir),
         );
 
-        let actions = apply_rules(&cfg, &repo).unwrap();
-        assert_eq!(actions.len(), 2);
+        let moves = plan_moves(&cfg, &repo).unwrap();
+        assert_eq!(moves.len(), 2);
 
         let pb1 = PathBuf::from_str("~/mail/mailbox1/some.mail").unwrap();
         let pb2 = PathBuf::from_str("~/mail/mailbox2/some.mail").unwrap();
 
-        let folder1 = *actions.get(&pb1).unwrap();
-        let folder2 = *actions.get(&pb2).unwrap();
+        let folder1 = *moves.get(&pb1).unwrap();
+        let folder2 = *moves.get(&pb2).unwrap();
 
         assert_eq!("mailbox1/Trash", folder1);
         assert_eq!("mailbox2/Trash", folder2);
@@ -541,7 +533,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        assert!(apply_rules(&sibling_prefixes, &repo).is_ok());
+        assert!(plan_moves(&sibling_prefixes, &repo).is_ok());
 
         // Same query pair, but now nested prefixes: only the shared subtree can overlap.
         let nested_prefixes = TestConfig {
@@ -556,7 +548,7 @@ mod tests {
             ..sibling_prefixes
         };
         assert!(
-            apply_rules(&nested_prefixes, &repo).is_ok(),
+            plan_moves(&nested_prefixes, &repo).is_ok(),
             "mail outside the shared subtree must not count as overlap"
         );
 
@@ -564,7 +556,7 @@ mod tests {
             "(tag:trash) AND (tag:trash)".to_string(),
             "~/mail/mailbox1/sub/some.mail".to_string(),
         );
-        let err = apply_rules(&nested_prefixes, &repo).unwrap_err();
+        let err = plan_moves(&nested_prefixes, &repo).unwrap_err();
         assert_eq!("Rules overlap (1 messages)", err.to_string());
     }
 
@@ -592,7 +584,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let err = apply_rules(&cfg, &repo).unwrap_err();
+        let err = plan_moves(&cfg, &repo).unwrap_err();
         assert_eq!("Rules overlap (1 messages)", err.to_string());
     }
 }

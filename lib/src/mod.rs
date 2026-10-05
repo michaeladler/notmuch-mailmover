@@ -1,15 +1,15 @@
 //! Rule engine and file mover behind the `notmuch-mailmover` binary.
 //!
-//! The crate is split into a pure decision phase and a side-effecting phase:
+//! The crate is split into a pure planning phase and a side-effecting phase:
 //!
-//! 1. [`engine::apply_rules`] evaluates the rules against a mail repository and
+//! 1. [`engine::plan_moves`] evaluates the rules against a mail repository and
 //!    returns the intended move for every matched message file. It touches no files.
-//! 2. [`action::apply_actions`] performs those moves on disk, or only reports them
+//! 2. [`action::move_files`] performs those moves on disk, or only reports them
 //!    when `dry_run` is set.
 //!
 //! Both phases are driven by a caller-supplied [`engine::Config`], so this crate
 //! holds no configuration file of its own; the binary owns YAML/Lua loading.
-//! Queries run through the [`repo::MailRepo`] trait, implemented for
+//! Queries run through the [`repo::Repo`] trait, implemented for
 //! [`notmuch::Database`] but replaceable, e.g. by tests.
 //!
 //! Note that applying rules is not idempotent: queries built from `folder:` or
@@ -63,8 +63,8 @@
 //!     None,
 //! )?;
 //!
-//! let actions = engine::apply_rules(&cfg, &db)?;
-//! action::apply_actions(&cfg, false, &actions)?;
+//! let moves = engine::plan_moves(&cfg, &db)?;
+//! action::move_files(&cfg, false, &moves)?;
 //! # Ok::<(), anyhow::Error>(())
 //! ```
 
