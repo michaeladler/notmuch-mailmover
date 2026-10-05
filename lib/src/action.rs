@@ -47,7 +47,7 @@ pub fn apply_actions(
             dest_file.push(basename);
         };
 
-        if src_file.parent() == dest_file.parent() {
+        if *src_file == dest_file {
             trace!(
                 "skipping {} as message is already in the correct destination",
                 src_file.to_string_lossy()
@@ -102,17 +102,20 @@ mod tests {
     use super::*;
     use crate::engine::{MatchMode, Rule};
 
-    struct TestCfg;
+    struct TestCfg {
+        maildir: String,
+        rename: bool,
+    }
 
     impl Config for TestCfg {
         fn maildir(&self) -> &str {
-            "/tmp/mail"
+            &self.maildir
         }
         fn max_age_days(&self) -> Option<u32> {
             None
         }
         fn rename(&self) -> bool {
-            false
+            self.rename
         }
         fn rules(&self) -> &[Rule] {
             &[]
@@ -124,10 +127,43 @@ mod tests {
 
     #[test]
     fn bare_filename_is_an_error_not_a_panic() {
+        let cfg = TestCfg {
+            maildir: "/tmp/mail".to_string(),
+            rename: false,
+        };
         let mut actions = HashMap::new();
         actions.insert(PathBuf::from("some.mail"), "Trash");
-        let err = apply_actions(&TestCfg, false, &actions).unwrap_err();
+        let err = apply_actions(&cfg, false, &actions).unwrap_err();
         assert_eq!("Failed to get mailbox name from some.mail", err.to_string());
+    }
+
+    /// A mail already in the target mailbox must still be renamed.
+    #[test]
+    fn rename_applies_to_mail_already_in_target_mailbox() {
+        let maildir = std::env::temp_dir().join("nmm-rename-test");
+        let _ = fs::remove_dir_all(&maildir);
+        // nested mailbox: destination parent resolves to the very same directory
+        let nested = maildir.join("INBOX").join("list");
+        fs::create_dir_all(&nested).unwrap();
+        let src = nested.join("1234.mail:2,S");
+        fs::write(&src, "mail").unwrap();
+
+        let cfg = TestCfg {
+            maildir: maildir.to_string_lossy().into_owned(),
+            rename: true,
+        };
+        let mut actions = HashMap::new();
+        actions.insert(src.clone(), "INBOX");
+        apply_actions(&cfg, false, &actions).unwrap();
+
+        assert!(!src.exists(), "old name must be gone");
+        let names: Vec<_> = fs::read_dir(&nested)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(1, names.len());
+        assert!(names[0].ends_with(":2,S"), "flags kept: {}", names[0]);
+        assert!(Uuid::parse_str(names[0].split(':').next().unwrap()).is_ok());
     }
 
     #[test]
