@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use nm_mailmover::engine::{self, MatchMode, Rule};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct Config {
     pub maildir: String,
     /// if omitted, it will use the same as notmuch would, see notmuch-config(1)
