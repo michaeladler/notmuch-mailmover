@@ -50,24 +50,26 @@ fn apply_unique<'a>(
                 let lhs = cfg.rules().get(i).unwrap();
                 let rhs = cfg.rules().get(j).unwrap();
 
-                let prefix = match (lhs.prefix.clone(), rhs.prefix.clone()) {
-                    (None, None) => None,
-                    // Compare as paths, not strings: filter_messages_with_prefix() matches
-                    // components, so "mailbox10" is not nested in "mailbox1" and filtering by
-                    // the narrower prefix would invent overlaps.
-                    (Some(lp), Some(rp)) => Some(if Path::new(&rp).starts_with(&lp) {
-                        rp
-                    } else if Path::new(&lp).starts_with(&rp) {
-                        lp
-                    } else {
-                        // If the two prefixes are not subwords of one another, then the queries
-                        // must match different mails so the following is unnecessary.
-                        continue;
-                    }),
-                    (l, r) => l.or(r),
-                }
-                .map(|s| Path::new(cfg.maildir()).join(s));
+                // Compare as paths, not strings: filter_messages_with_prefix() matches
+                // components, so "mailbox10" is not nested in "mailbox1" and filtering by
+                // the narrower prefix would invent overlaps.
+                // A missing prefix means the whole maildir, i.e. the empty root path that every
+                // prefix starts with.
+                let lp = lhs.prefix.as_deref().map_or(Path::new(""), Path::new);
+                let rp = rhs.prefix.as_deref().map_or(Path::new(""), Path::new);
+                let prefix = if rp.starts_with(lp) {
+                    Some(rp)
+                } else if lp.starts_with(rp) {
+                    Some(lp)
+                } else {
+                    // If the two prefixes are not subwords of one another, then the queries
+                    // must match different mails so the following is unnecessary.
+                    continue;
+                };
                 debug!("prefix: {prefix:?}");
+                let prefix = prefix
+                    .filter(|p| !p.as_os_str().is_empty())
+                    .map(|p| Path::new(cfg.maildir()).join(p));
 
                 combined_query.clear();
                 write!(combined_query, "({}) AND ({})", lhs.query, rhs.query)?;
@@ -546,6 +548,34 @@ mod tests {
             "~/mail/mailbox1/sub/some.mail".to_string(),
         );
         let err = apply_rules(&nested_prefixes, &repo).unwrap_err();
+        assert_eq!("Rules overlap (1 messages)", err.to_string());
+    }
+
+    #[test]
+    fn missing_prefix_counts_as_maildir_root() {
+        let mut repo: DummyRepo = Default::default();
+        repo.add_mail(
+            "(tag:trash) AND (tag:trash)".to_string(),
+            "~/mail/mailbox1/some.mail".to_string(),
+        );
+
+        let cfg = TestConfig {
+            rule_match_mode: Some(MatchMode::Unique),
+            rules: vec![
+                Rule {
+                    folder: "Trash".to_string(),
+                    query: "tag:trash".to_string(),
+                    prefix: Some("mailbox1".to_string()),
+                },
+                Rule {
+                    folder: "Other".to_string(),
+                    query: "tag:trash".to_string(),
+                    prefix: None,
+                },
+            ],
+            ..Default::default()
+        };
+        let err = apply_rules(&cfg, &repo).unwrap_err();
         assert_eq!("Rules overlap (1 messages)", err.to_string());
     }
 }
