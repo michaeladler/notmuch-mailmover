@@ -70,6 +70,7 @@ pub fn apply_actions(
             dest_file.to_string_lossy()
         );
         if src_file.exists() {
+            fs::create_dir_all(dest_file.parent().unwrap())?;
             fs::rename(src_file, dest_file)?;
             counter += 1;
         } else {
@@ -163,6 +164,26 @@ mod tests {
         assert_eq!(1, names.len());
         assert!(names[0].ends_with(":2,S"), "flags kept: {}", names[0]);
         assert!(Uuid::parse_str(names[0].split(':').next().unwrap()).is_ok());
+    }
+
+    #[test]
+    fn move_creates_missing_destination_directory() {
+        let maildir = std::env::temp_dir().join("nmm-mkdir-test");
+        let _ = fs::remove_dir_all(&maildir);
+        let src_dir = maildir.join("INBOX");
+        fs::create_dir_all(&src_dir).unwrap();
+        let src = src_dir.join("1234.mail:2,S");
+        fs::write(&src, "mail").unwrap();
+
+        let cfg = TestCfg {
+            maildir: maildir.to_string_lossy().into_owned(),
+            rename: false,
+        };
+        let mut actions = HashMap::new();
+        actions.insert(src, "Archive/2026");
+        apply_actions(&cfg, false, &actions).unwrap();
+
+        assert!(maildir.join("Archive/2026/INBOX").is_dir());
     }
 
     #[test]
