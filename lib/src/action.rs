@@ -3,11 +3,11 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{Result, anyhow};
 use log::{debug, info, trace, warn};
 use uuid::Uuid;
 
 use crate::engine::Moves;
+use crate::{Error, Result};
 
 /// Moves the files collected by [`crate::engine::plan_moves`].
 ///
@@ -40,18 +40,13 @@ pub fn move_files(maildir: &str, rename: bool, dry_run: bool, moves: &Moves) -> 
     for (src_file, folder) in moves {
         let basename = src_file
             .file_name()
-            .ok_or_else(|| anyhow!("Failed to get filename from {}", src_file.to_string_lossy()))?;
+            .ok_or_else(|| Error::NoFileName(src_file.to_string_lossy().into_owned()))?;
 
         // keep the original mailbox subtree, so nested folders move within it
         let mailbox = src_file
             .parent()
             .and_then(|p| p.file_name())
-            .ok_or_else(|| {
-                anyhow!(
-                    "Failed to get mailbox name from {}",
-                    src_file.to_string_lossy()
-                )
-            })?;
+            .ok_or_else(|| Error::NoMailboxName(src_file.to_string_lossy().into_owned()))?;
 
         let mut dest_file = PathBuf::from(maildir).join(folder).join(mailbox);
         if rename {

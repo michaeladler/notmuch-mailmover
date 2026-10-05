@@ -1,5 +1,6 @@
-use anyhow::Result;
 use std::path::PathBuf;
+
+use crate::Result;
 
 /// Source of messages for the rule engine.
 ///
@@ -18,9 +19,8 @@ pub trait Repo {
 /// With the `notmuch` feature, a `notmuch::Database` is a `Repo` out of the box:
 ///
 /// ```no_run
-/// # use anyhow::Result;
+/// # use nm_mailmover::{repo::Repo, Result};
 /// # use std::path::PathBuf;
-/// # use nm_mailmover::repo::Repo;
 /// # fn main() -> Result<()> {
 /// let db = notmuch::Database::open_with_config(
 ///     None::<&str>,

@@ -62,16 +62,52 @@
 //! struct MyRepo;
 //!
 //! impl Repo for MyRepo {
-//!     fn search_messages(&self, query: &str) -> anyhow::Result<Vec<std::path::PathBuf>> {
+//!     fn search_messages(&self, query: &str) -> nm_mailmover::Result<Vec<std::path::PathBuf>> {
 //!         Ok(Vec::new())
 //!     }
 //! }
 //!
 //! let moves = engine::plan_moves(&cfg, &MyRepo)?;
 //! action::move_files(cfg.maildir(), cfg.rename(), false, &moves)?;
-//! # Ok::<(), anyhow::Error>(())
+//! # Ok::<(), nm_mailmover::Error>(())
 //! ```
 
 pub mod action;
 pub mod engine;
 pub mod repo;
+
+/// Result type used throughout this crate.
+pub type Result<T> = std::result::Result<T, Error>;
+
+/// Everything that can go wrong while planning or applying moves.
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    /// Two rules in `MatchMode::Unique` select the same message.
+    #[error("Rules overlap ({0} messages)")]
+    RuleOverlap(usize),
+
+    /// One message ended up assigned to two different folders.
+    #[error(
+        "Ambiguous rule! Message already assigned to folder {old}, cannot assign to folder {new}"
+    )]
+    AmbiguousFolder { old: String, new: String },
+
+    /// Message path has no file name component.
+    #[error("Failed to get filename from {0}")]
+    NoFileName(String),
+
+    /// Message path has no mailbox (parent directory) component.
+    #[error("Failed to get mailbox name from {0}")]
+    NoMailboxName(String),
+
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    /// Only possible when writing into a `String`, i.e. never in practice.
+    #[error(transparent)]
+    Fmt(#[from] std::fmt::Error),
+
+    #[cfg(feature = "notmuch")]
+    #[error(transparent)]
+    Notmuch(#[from] notmuch::Error),
+}

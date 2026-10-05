@@ -18,7 +18,7 @@ notmuch = ["dep:notmuch"]
 
 [dependencies]
 uuid = { version = "1.16.0", features = ["v4"] }
-anyhow = "1.0.98"
+thiserror = "2"
 log = "0.4.27"
 notmuch = { version = "0.8.0", optional = true }
 serde = { version = "1.0", features = ["derive"] }

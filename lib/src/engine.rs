@@ -5,11 +5,11 @@ use std::fmt::Write as _;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
-use anyhow::{Result, anyhow};
 use log::{debug, error, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::repo::Repo;
+use crate::{Error, Result};
 
 /// Message files and the destination folder each should be moved to, sorted by
 /// source path so a run is reproducible.
@@ -58,7 +58,7 @@ fn filter_by_prefix(messages: &[PathBuf], prefix: &Path) -> Vec<PathBuf> {
 /// [`Config::rule_match_mode`] selects between three strategies:
 ///
 /// * [`MatchMode::Unique`] (the default): rules must be pairwise disjoint. All
-///   pairs are probed for overlap first and an [`anyhow::Error`] is returned
+///   pairs are probed for overlap first and an [`Error`] is returned
 ///   before anything moves, if two queries can match the same message.
 /// * [`MatchMode::First`]: the first matching rule wins. Later rules get
 ///   `AND NOT (<earlier queries>)` appended, so rule order decides.
@@ -159,7 +159,7 @@ fn plan_unique<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Assigned<'a>
         }
         let overlap_count: usize = overlaps.values().sum();
         if overlap_count > 0 {
-            return Err(anyhow!("Rules overlap ({} messages)", overlap_count));
+            return Err(Error::RuleOverlap(overlap_count));
         }
     }
 
@@ -171,12 +171,10 @@ fn plan_unique<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Assigned<'a>
             if let Some(old) = assign(&mut moves, filename, rule.folder.as_str())
                 && old != rule.folder
             {
-                let msg = format!(
-                    "Ambiguous rule! Message already assigned to folder {old}, \
-                     cannot assign to folder {}",
-                    rule.folder
-                );
-                return Err(anyhow!(msg));
+                return Err(Error::AmbiguousFolder {
+                    old: old.to_string(),
+                    new: rule.folder.clone(),
+                });
             }
         }
     }
