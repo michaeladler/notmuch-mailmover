@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 use env_logger::Env;
 use log::{debug, info};
@@ -24,13 +24,14 @@ fn main() -> Result<()> {
         notmuch::DatabaseMode::ReadOnly,
         cfg.notmuch_config.as_ref(),
         None,
-    )?;
+    )
+    .context("failed to open notmuch database")?;
     debug!("successfully opened notmuch db");
 
     let start = Instant::now();
 
-    let actions = engine::apply_rules(&cfg, &db)?;
-    action::apply_actions(&cfg, opts.dry_run, &actions)?;
+    let actions = engine::apply_rules(&cfg, &db).context("failed to apply rules")?;
+    action::apply_actions(&cfg, opts.dry_run, &actions).context("failed to apply actions")?;
 
     let duration = start.elapsed();
     info!("execution took {duration:?}");
