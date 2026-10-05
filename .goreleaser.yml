@@ -14,7 +14,7 @@ builds:
 
 archives:
   - id: notmuch-mailmover
-    ids: [ notmuch-mailmover ]
+    ids: [notmuch-mailmover]
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
       {{- if eq .Os "darwin" }}macOS
@@ -23,7 +23,7 @@ archives:
       {{- if eq .Arch "amd64" }}x86_64
       {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
-      - formats: ['tar.zst']
+      - formats: ["tar.zst"]
     files:
       - LICENSE
       - share
@@ -31,13 +31,13 @@ archives:
 nfpms:
   - id: notmuch-mailmover
     package_name: notmuch-mailmover
-    ids: [ notmuch-mailmover ]
+    ids: [notmuch-mailmover]
     formats:
       - deb
       - rpm
     maintainer: Michael Adler <therisen06@gmail.com>
     homepage: https://github.com/michaeladler/notmuch-mailmover
-    description:  move notmuch tagged mails into Maildir folders
+    description: move notmuch tagged mails into Maildir folders
     dependencies:
       - notmuch
     section: mail
@@ -60,16 +60,16 @@ nfpms:
       - src: share/notmuch-mailmover.fish
         dst: /usr/share/fish/completions/notmuch-mailmover.fish
 
-      # man page
-      - src: share/notmuch-mailmover.1.gz
-        dst: /usr/share/man/man1/notmuch-mailmover.1.gz
+      # man page (uncompressed; dpkg/rpm compress man pages themselves)
+      - src: share/notmuch-mailmover.1
+        dst: /usr/share/man/man1/notmuch-mailmover.1
 
       # example configurations
       - src: example/
         dst: /usr/share/doc/notmuch-mailmover/example/
 
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 
 release:
   draft: true

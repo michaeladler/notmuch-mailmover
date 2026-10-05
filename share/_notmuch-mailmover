@@ -1,0 +1,15 @@
+#compdef notmuch-mailmover
+
+_notmuch-mailmover() {
+    local -a arguments
+    arguments=(
+        '(-c --config)'{-c,--config}'[use the provided config file instead of the default]:file:_files' \
+        '(-l --log-level)'{-l,--log-level}'[configure the log level]:level:(trace debug info warn error)' \
+        '(-d --dry-run)'{-d,--dry-run}'[enable dry-run mode, i.e. no files are being moved]' \
+        '(-h --help)'{-h,--help}'[print help information]' \
+        '--version[print version information]'
+    )
+    _arguments -s $arguments
+}
+
+_notmuch-mailmover "$@"

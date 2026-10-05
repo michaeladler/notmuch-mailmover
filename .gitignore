@@ -1,5 +1,4 @@
 /target
 /result
 /dist
-/share
 .pre-commit-config.yaml

@@ -55,7 +55,7 @@
             ];
 
             postInstall = ''
-              installManPage share/notmuch-mailmover.1.gz
+              installManPage share/notmuch-mailmover.1
               installShellCompletion --cmd notmuch-mailmover \
                 --bash share/notmuch-mailmover.bash \
                 --fish share/notmuch-mailmover.fish \

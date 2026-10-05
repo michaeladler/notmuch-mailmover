@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use clap::Parser;
 use env_logger::Env;
 use log::{debug, info};
 use std::time::Instant;
@@ -10,7 +9,13 @@ mod config;
 use nm_mailmover::{action, engine};
 
 fn main() -> Result<()> {
-    let opts = cli::Cli::parse();
+    let opts: cli::Cli = argh::from_env();
+
+    // Argh has no built-in version flag, unlike clap's `#[command(version)]`.
+    if opts.version {
+        println!("notmuch-mailmover {}", cli::VERSION);
+        return Ok(());
+    }
 
     let env = Env::default().default_filter_or(opts.log_level.to_string());
     env_logger::try_init_from_env(env)?;

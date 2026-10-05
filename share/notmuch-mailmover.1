@@ -1,0 +1,24 @@
+.TH "notmuch-mailmover" "1"
+.SH NAME
+notmuch-mailmover \- move notmuch tagged mails into Maildir folders
+.SH SYNOPSIS
+.B notmuch-mailmover
+[\fB\-c\fR \fIFILE\fR] [\fB\-l\fR \fILEVEL\fR] [\fB\-d\fR] [\fB\-V\fR]
+.SH DESCRIPTION
+Move notmuch tagged mails into Maildir folders
+.SH OPTIONS
+.TP
+\fB\-c\fR, \fB\-\-config\fR \fIFILE\fR
+use the provided config file instead of the default
+.TP
+\fB\-l\fR, \fB\-\-log\-level\fR \fILEVEL\fR
+configure the log level [default: info] [possible values: trace, debug, info, warn, error]
+.TP
+\fB\-d\fR, \fB\-\-dry\-run\fR
+enable dry-run mode, i.e. no files are being moved
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print version information
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+print help information

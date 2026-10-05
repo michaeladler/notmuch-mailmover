@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Parser, ValueEnum, crate_authors};
+use argh::FromArgs;
 
 use git_version::git_version;
 
@@ -20,27 +20,27 @@ const fn remove_leading_v(version: &'static str) -> &'static str {
     }
 }
 
-#[derive(Parser)]
-#[clap(
-    name = "notmuch-mailmover",
-    version = VERSION,
-    author = crate_authors!(),
-)]
+/// move notmuch tagged mails into Maildir folders
+#[derive(FromArgs)]
 pub struct Cli {
-    /// Use the provided config file instead of the default
-    #[arg(short, long, value_name = "FILE")]
+    /// use the provided config file instead of the default
+    #[argh(option, short = 'c')]
     pub config: Option<PathBuf>,
 
-    /// Configure the log level
-    #[clap(short,long, value_parser, ignore_case = true, value_enum, default_value_t = Default::default())]
+    /// configure the log level
+    #[argh(option, short = 'l', default = "LogLevel::default()")]
     pub log_level: LogLevel,
 
-    /// Enable dry-run mode, i.e. no files are being moved
-    #[clap(short, long, action)]
+    /// enable dry-run mode, i.e. no files are being moved
+    #[argh(switch, short = 'd')]
     pub dry_run: bool,
+
+    /// print version information
+    #[argh(switch, short = 'V')]
+    pub version: bool,
 }
 
-#[derive(Clone, ValueEnum, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub enum LogLevel {
     Trace,
     Debug,
@@ -48,6 +48,23 @@ pub enum LogLevel {
     Info,
     Warn,
     Error,
+}
+
+impl std::str::FromStr for LogLevel {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "trace" => Ok(Self::Trace),
+            "debug" => Ok(Self::Debug),
+            "info" => Ok(Self::Info),
+            "warn" => Ok(Self::Warn),
+            "error" => Ok(Self::Error),
+            _ => Err(format!(
+                "invalid log level {s:?}, expected one of trace, debug, info, warn, error"
+            )),
+        }
+    }
 }
 
 impl std::fmt::Display for LogLevel {
