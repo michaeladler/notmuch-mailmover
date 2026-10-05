@@ -81,7 +81,7 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
     };
     debug!("loading config {fname:?}");
 
-    let mut cfg = if fname.extension().is_some_and(|ext| ext == "lua") {
+    let mut cfg: Config = if fname.extension().is_some_and(|ext| ext == "lua") {
         let lua = Lua::new();
         let moduledir = fname
             .parent()
@@ -93,13 +93,11 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
         ))
         .exec()?;
         let val = lua.load(fname.clone()).eval()?;
-        let cfg: Config = lua.from_value(val)?;
-        cfg
+        lua.from_value(val)?
     } else {
-        let f = File::open(fname)?;
+        let f = File::open(&fname)?;
         let reader = BufReader::new(f);
-        let cfg: Config = yaml_serde::from_reader(reader)?;
-        cfg
+        yaml_serde::from_reader(reader)?
     };
 
     let db_path = shellexpand::full(&cfg.maildir)?;
