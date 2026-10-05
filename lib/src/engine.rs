@@ -52,10 +52,13 @@ fn apply_unique<'a>(
 
                 let prefix = match (lhs.prefix.clone(), rhs.prefix.clone()) {
                     (None, None) => None,
-                    (Some(lp), Some(rp)) => Some(if lp.starts_with(&rp) {
-                        lp
-                    } else if rp.starts_with(&lp) {
+                    // Compare as paths, not strings: filter_messages_with_prefix() matches
+                    // components, so "mailbox10" is not nested in "mailbox1" and filtering by
+                    // the narrower prefix would invent overlaps.
+                    (Some(lp), Some(rp)) => Some(if Path::new(&rp).starts_with(&lp) {
                         rp
+                    } else if Path::new(&lp).starts_with(&rp) {
+                        lp
                     } else {
                         // If the two prefixes are not subwords of one another, then the queries
                         // must match different mails so the following is unnecessary.
@@ -491,5 +494,58 @@ mod tests {
 
         assert_eq!("mailbox1/Trash", folder1);
         assert_eq!("mailbox2/Trash", folder2);
+    }
+
+    #[test]
+    fn prefixes_are_matched_per_path_component() {
+        let mut repo: DummyRepo = Default::default();
+        // One mail matching both queries, but only inside the mailbox10 subtree: not a real
+        // overlap, because "mailbox10" is not nested in "mailbox1".
+        repo.add_mail(
+            "(tag:trash) AND (tag:trash)".to_string(),
+            "~/mail/mailbox10/some.mail".to_string(),
+        );
+
+        let sibling_prefixes = TestConfig {
+            rule_match_mode: Some(MatchMode::Unique),
+            rules: vec![
+                Rule {
+                    folder: "mailbox1/Trash".to_string(),
+                    query: "tag:trash".to_string(),
+                    prefix: Some("mailbox1".to_string()),
+                },
+                Rule {
+                    folder: "mailbox10/Trash".to_string(),
+                    query: "tag:trash".to_string(),
+                    prefix: Some("mailbox10".to_string()),
+                },
+            ],
+            ..Default::default()
+        };
+        assert!(apply_rules(&sibling_prefixes, &repo).is_ok());
+
+        // Same query pair, but now nested prefixes: only the shared subtree can overlap.
+        let nested_prefixes = TestConfig {
+            rules: vec![
+                sibling_prefixes.rules[0].clone(),
+                Rule {
+                    folder: "mailbox1/sub/Trash".to_string(),
+                    query: "tag:trash".to_string(),
+                    prefix: Some("mailbox1/sub".to_string()),
+                },
+            ],
+            ..sibling_prefixes
+        };
+        assert!(
+            apply_rules(&nested_prefixes, &repo).is_ok(),
+            "mail outside the shared subtree must not count as overlap"
+        );
+
+        repo.add_mail(
+            "(tag:trash) AND (tag:trash)".to_string(),
+            "~/mail/mailbox1/sub/some.mail".to_string(),
+        );
+        let err = apply_rules(&nested_prefixes, &repo).unwrap_err();
+        assert_eq!("Rules overlap (1 messages)", err.to_string());
     }
 }
