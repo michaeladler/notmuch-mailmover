@@ -100,8 +100,8 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
         yaml_serde::from_reader(reader)?
     };
 
-    let db_path = shellexpand::full(&cfg.maildir)?;
-    cfg.maildir = db_path.to_string();
+    let maildir = shellexpand::full(&cfg.maildir)?;
+    cfg.maildir = maildir.to_string();
 
     if let Some(cfg_path) = cfg.notmuch_config {
         let path = shellexpand::full(&cfg_path)?;
