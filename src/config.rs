@@ -5,7 +5,9 @@ use anyhow::{anyhow, Result};
 use directories::BaseDirs;
 use log::debug;
 use mlua::{Lua, LuaSerdeExt};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
+
+use nm_mailmover::engine::{self, MatchMode, Rule};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -16,58 +18,6 @@ pub struct Config {
     pub max_age_days: Option<u32>,
     pub rules: Vec<Rule>,
     pub rule_match_mode: Option<MatchMode>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum MatchMode {
-    Unique,
-    First,
-    All,
-}
-
-impl Serialize for MatchMode {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        use MatchMode::*;
-        match self {
-            Unique => serializer.serialize_str("unique"),
-            First => serializer.serialize_str("first"),
-            All => serializer.serialize_str("all"),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for MatchMode {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct MatchModeVisitor;
-
-        impl serde::de::Visitor<'_> for MatchModeVisitor {
-            type Value = MatchMode;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a string representing a match mode")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<MatchMode, E>
-            where
-                E: serde::de::Error,
-            {
-                match value {
-                    "unique" => Ok(MatchMode::Unique),
-                    "first" => Ok(MatchMode::First),
-                    "all" => Ok(MatchMode::All),
-                    _ => Err(E::custom(format!("unknown match mode: {value}"))),
-                }
-            }
-        }
-
-        deserializer.deserialize_str(MatchModeVisitor)
-    }
 }
 
 impl Default for Config {
@@ -83,25 +33,21 @@ impl Default for Config {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Rule {
-    pub folder: String,
-    pub query: String,
-    pub prefix: Option<String>,
-}
-
-impl std::fmt::Display for Rule {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "Rule {}{}: {}",
-            self.folder,
-            self.prefix
-                .as_ref()
-                .map(|m| format!(" with prefix '{m}'"))
-                .unwrap_or_default(),
-            self.query
-        )
+impl engine::Config for Config {
+    fn maildir(&self) -> &str {
+        &self.maildir
+    }
+    fn max_age_days(&self) -> Option<u32> {
+        self.max_age_days
+    }
+    fn rename(&self) -> bool {
+        self.rename
+    }
+    fn rules(&self) -> &[Rule] {
+        &self.rules
+    }
+    fn rule_match_mode(&self) -> Option<MatchMode> {
+        self.rule_match_mode
     }
 }
 

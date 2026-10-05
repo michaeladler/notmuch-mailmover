@@ -8,9 +8,13 @@ use anyhow::{anyhow, Result};
 use log::{debug, info, trace, warn};
 use uuid::Uuid;
 
-use crate::config::Config;
+use crate::engine::Config;
 
-pub fn apply_actions(cfg: &Config, dry_run: bool, actions: &HashMap<PathBuf, &str>) -> Result<()> {
+pub fn apply_actions(
+    cfg: &impl Config,
+    dry_run: bool,
+    actions: &HashMap<PathBuf, &str>,
+) -> Result<()> {
     if actions.is_empty() {
         info!("nothing to do");
         return Ok(());
@@ -24,11 +28,11 @@ pub fn apply_actions(cfg: &Config, dry_run: bool, actions: &HashMap<PathBuf, &st
             .file_name()
             .ok_or_else(|| anyhow!("Failed to get filename from {}", src_file.to_string_lossy()))?;
 
-        let db_path = PathBuf::from(&cfg.maildir);
+        let db_path = PathBuf::from(cfg.maildir());
         let mut dest_file = db_path
             .join(folder)
             .join(src_file.parent().unwrap().file_name().unwrap());
-        if cfg.rename {
+        if cfg.rename() {
             dest_file.push(get_new_name(basename));
         } else {
             dest_file.push(basename);

@@ -3,8 +3,8 @@ use std::{collections::HashMap, path::Path, path::PathBuf};
 
 use anyhow::{anyhow, Result};
 use log::{debug, error, warn};
+use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::config::{Config, MatchMode};
 use crate::repo::MailRepo;
 
 fn filter_messages_with_prefix(messages: &[PathBuf], prefix: &PathBuf) -> Vec<PathBuf> {
@@ -23,26 +23,32 @@ fn filter_messages_with_prefix(messages: &[PathBuf], prefix: &PathBuf) -> Vec<Pa
 /// Apply the given rules to the mails in the repository.
 /// The result is a HashMap which is assigns messages (files) to their new destination folders.
 /// Note that no messages are actually moved at this stage.
-pub fn apply_rules<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf, &'a str>> {
+pub fn apply_rules<'a>(
+    cfg: &'a impl Config,
+    repo: &dyn MailRepo,
+) -> Result<HashMap<PathBuf, &'a str>> {
     debug!("applying rules");
-    match cfg.rule_match_mode.unwrap_or(MatchMode::Unique) {
+    match cfg.rule_match_mode().unwrap_or(MatchMode::Unique) {
         MatchMode::Unique => apply_unique(cfg, repo),
         MatchMode::First => apply_first(cfg, repo),
         MatchMode::All => apply_all(cfg, repo),
     }
 }
 
-fn apply_unique<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf, &'a str>> {
+fn apply_unique<'a>(
+    cfg: &'a impl Config,
+    repo: &dyn MailRepo,
+) -> Result<HashMap<PathBuf, &'a str>> {
     let mut actions = HashMap::new();
-    let n = cfg.rules.len();
+    let n = cfg.rules().len();
     if n > 0 {
         let mut overlap_count: usize = 0;
         debug!("checking if any two rules overlap");
         let mut combined_query = String::with_capacity(2048);
         for i in 0..n - 1 {
             for j in i + 1..n {
-                let lhs = cfg.rules.get(i).unwrap();
-                let rhs = cfg.rules.get(j).unwrap();
+                let lhs = cfg.rules().get(i).unwrap();
+                let rhs = cfg.rules().get(j).unwrap();
 
                 let prefix = match (lhs.prefix.clone(), rhs.prefix.clone()) {
                     (None, None) => None,
@@ -57,12 +63,12 @@ fn apply_unique<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<Path
                     }),
                     (l, r) => l.or(r),
                 }
-                .map(|s| Path::new(&cfg.maildir).join(s));
+                .map(|s| Path::new(cfg.maildir()).join(s));
                 debug!("prefix: {prefix:?}");
 
                 combined_query.clear();
                 write!(combined_query, "({}) AND ({})", lhs.query, rhs.query)?;
-                if let Some(days) = cfg.max_age_days {
+                if let Some(days) = cfg.max_age_days() {
                     write!(combined_query, " AND date:\"{days}_days\"..")?;
                 }
                 debug!("combined query: {combined_query}");
@@ -86,15 +92,15 @@ fn apply_unique<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<Path
         }
     }
 
-    for rule in &cfg.rules {
-        let mut query_str = format!("NOT folder:\"{}\" AND ({})", rule.folder, &rule.query);
-        if let Some(days) = cfg.max_age_days {
+    for rule in cfg.rules() {
+        let mut query_str = format!("NOT folder:\"{}\" AND ({})", rule.folder, rule.query);
+        if let Some(days) = cfg.max_age_days() {
             write!(query_str, " AND date:\"{days}_days\"..")?;
         }
         debug!("using query: {query_str}");
         let all_messages = repo.search_message(&query_str)?;
         let messages = if let Some(pre) = &rule.prefix {
-            let prefix = Path::new(&cfg.maildir).join(pre);
+            let prefix = Path::new(cfg.maildir()).join(pre);
             debug!("using prefix: {prefix:?}");
             filter_messages_with_prefix(&all_messages, &prefix)
         } else {
@@ -111,16 +117,16 @@ fn apply_unique<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<Path
     Ok(actions)
 }
 
-fn apply_first<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf, &'a str>> {
+fn apply_first<'a>(cfg: &'a impl Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf, &'a str>> {
     let mut actions = HashMap::new();
     // exclude previous rules and folders
     let mut exclude = String::with_capacity(32768);
-    for rule in &cfg.rules {
-        let mut query_str = format!("(NOT folder:{}) AND ({})", &rule.folder, &rule.query);
+    for rule in cfg.rules() {
+        let mut query_str = format!("(NOT folder:{}) AND ({})", rule.folder, rule.query);
         if !exclude.is_empty() {
             write!(query_str, " AND ({exclude})")?;
         }
-        if let Some(days) = cfg.max_age_days {
+        if let Some(days) = cfg.max_age_days() {
             write!(query_str, " AND date:\"{days}_days\"..")?;
         }
 
@@ -143,11 +149,11 @@ fn apply_first<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<PathB
     Ok(actions)
 }
 
-fn apply_all<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf, &'a str>> {
+fn apply_all<'a>(cfg: &'a impl Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf, &'a str>> {
     let mut actions = HashMap::new();
-    for rule in &cfg.rules {
-        let mut query_str = format!("({})", &rule.query);
-        if let Some(days) = cfg.max_age_days {
+    for rule in cfg.rules() {
+        let mut query_str = format!("({})", rule.query);
+        if let Some(days) = cfg.max_age_days() {
             write!(query_str, " AND date:\"{days}_days\"..")?;
         }
         let messages = repo.search_message(&query_str)?;
@@ -166,6 +172,89 @@ fn apply_all<'a>(cfg: &'a Config, repo: &dyn MailRepo) -> Result<HashMap<PathBuf
         }
     }
     Ok(actions)
+}
+
+/// Input contract for the rule engine and the file mover.
+pub trait Config {
+    fn maildir(&self) -> &str;
+    fn max_age_days(&self) -> Option<u32>;
+    fn rename(&self) -> bool;
+    fn rules(&self) -> &[Rule];
+    fn rule_match_mode(&self) -> Option<MatchMode>;
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Rule {
+    pub folder: String,
+    pub query: String,
+    pub prefix: Option<String>,
+}
+
+impl std::fmt::Display for Rule {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "Rule {}{}: {}",
+            self.folder,
+            self.prefix
+                .as_ref()
+                .map(|m| format!(" with prefix '{m}'"))
+                .unwrap_or_default(),
+            self.query
+        )
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum MatchMode {
+    Unique,
+    First,
+    All,
+}
+
+impl Serialize for MatchMode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        use MatchMode::*;
+        match self {
+            Unique => serializer.serialize_str("unique"),
+            First => serializer.serialize_str("first"),
+            All => serializer.serialize_str("all"),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for MatchMode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct MatchModeVisitor;
+
+        impl serde::de::Visitor<'_> for MatchModeVisitor {
+            type Value = MatchMode;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string representing a match mode")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<MatchMode, E>
+            where
+                E: serde::de::Error,
+            {
+                match value {
+                    "unique" => Ok(MatchMode::Unique),
+                    "first" => Ok(MatchMode::First),
+                    "all" => Ok(MatchMode::All),
+                    _ => Err(E::custom(format!("unknown match mode: {value}"))),
+                }
+            }
+        }
+
+        deserializer.deserialize_str(MatchModeVisitor)
+    }
 }
 
 #[cfg(test)]
@@ -199,11 +288,49 @@ mod tests {
     }
 
     use super::*;
-    use crate::config::Rule;
+
+    #[derive(Clone)]
+    struct TestConfig {
+        maildir: String,
+        rename: bool,
+        max_age_days: Option<u32>,
+        rules: Vec<Rule>,
+        rule_match_mode: Option<MatchMode>,
+    }
+
+    impl Default for TestConfig {
+        fn default() -> Self {
+            Self {
+                maildir: "~/mail".to_string(),
+                rename: false,
+                max_age_days: None,
+                rules: Vec::new(),
+                rule_match_mode: None,
+            }
+        }
+    }
+
+    impl Config for TestConfig {
+        fn maildir(&self) -> &str {
+            &self.maildir
+        }
+        fn max_age_days(&self) -> Option<u32> {
+            self.max_age_days
+        }
+        fn rename(&self) -> bool {
+            self.rename
+        }
+        fn rules(&self) -> &[Rule] {
+            &self.rules
+        }
+        fn rule_match_mode(&self) -> Option<MatchMode> {
+            self.rule_match_mode
+        }
+    }
 
     #[test]
     fn simple_test() {
-        let mut cfg: Config = Default::default();
+        let mut cfg: TestConfig = Default::default();
         cfg.rules.push(Rule {
             folder: "Trash".to_string(),
             query: "tag:trash".to_string(),
@@ -240,7 +367,7 @@ mod tests {
             "some.mail".to_string(),
         );
 
-        let mut cfg1: Config = Default::default();
+        let mut cfg1: TestConfig = Default::default();
         cfg1.rules.push(Rule {
             folder: "Trash".to_string(),
             query: "tag:trash".to_string(),
@@ -265,7 +392,7 @@ mod tests {
 
     #[test]
     fn rule_match_mode_first_test() {
-        let cfg = Config {
+        let cfg = TestConfig {
             rule_match_mode: Some(MatchMode::First),
             rules: vec![
                 Rule {
@@ -296,7 +423,7 @@ mod tests {
 
     #[test]
     fn rule_match_mode_all() {
-        let cfg = Config {
+        let cfg = TestConfig {
             rule_match_mode: Some(MatchMode::All),
             rules: vec![
                 Rule {
@@ -324,7 +451,7 @@ mod tests {
 
     #[test]
     fn rules_with_prefixes() {
-        let cfg = Config {
+        let cfg = TestConfig {
             rule_match_mode: Some(MatchMode::Unique),
             rules: vec![
                 Rule {

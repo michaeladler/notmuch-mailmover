@@ -6,10 +6,10 @@ use flate2::Compression;
 use std::fs::{create_dir_all, File};
 use std::path::Path;
 
-include!("src/lib/cli.rs");
+include!("src/cli.rs");
 
 fn main() {
-    println!("cargo::rerun-if-changed=src/lib/cli.rs");
+    println!("cargo::rerun-if-changed=src/cli.rs");
 
     let out = &Path::new("share");
     create_dir_all(out).unwrap();

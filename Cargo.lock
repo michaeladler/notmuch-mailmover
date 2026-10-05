@@ -642,10 +642,21 @@ dependencies = [
  "log",
  "mlua",
  "notmuch",
- "regex",
+ "notmuch-mailmover-lib",
  "serde",
  "serde_yaml_ng",
  "shellexpand",
+]
+
+[[package]]
+name = "notmuch-mailmover-lib"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "log",
+ "notmuch",
+ "regex",
+ "serde",
  "uuid",
 ]
 
