@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::Path, path::PathBuf};
 
 use anyhow::{anyhow, Result};
 use log::{debug, error, warn};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::repo::MailRepo;
 
@@ -215,56 +215,12 @@ impl std::fmt::Display for Rule {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
 pub enum MatchMode {
     Unique,
     First,
     All,
-}
-
-impl Serialize for MatchMode {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        use MatchMode::*;
-        match self {
-            Unique => serializer.serialize_str("unique"),
-            First => serializer.serialize_str("first"),
-            All => serializer.serialize_str("all"),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for MatchMode {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct MatchModeVisitor;
-
-        impl serde::de::Visitor<'_> for MatchModeVisitor {
-            type Value = MatchMode;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a string representing a match mode")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<MatchMode, E>
-            where
-                E: serde::de::Error,
-            {
-                match value {
-                    "unique" => Ok(MatchMode::Unique),
-                    "first" => Ok(MatchMode::First),
-                    "all" => Ok(MatchMode::All),
-                    _ => Err(E::custom(format!("unknown match mode: {value}"))),
-                }
-            }
-        }
-
-        deserializer.deserialize_str(MatchModeVisitor)
-    }
 }
 
 #[cfg(test)]
