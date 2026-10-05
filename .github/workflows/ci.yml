@@ -1,47 +1,25 @@
 name: ci
 on: [push, pull_request, workflow_dispatch]
 jobs:
-  build:
-    name: build
+  nix:
+    name: nix flake check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v17
         with:
-          fetch-depth: 0 # needed to embed version information
-      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
-      - name: Install deps
-        run: sudo .ci/install-deps.sh
-      - run: cargo build --release
-      - run: cargo test --all-features
-      - run: cargo test -p notmuch-mailmover-lib --no-default-features
+          name: michaeladler
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix flake check -L --keep-going --show-trace
+      # my-crate is already built by flake check, so this is a cache hit.
+      - run: nix build .#my-crate
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: notmuch-mailmover
-          path: |
-            target/release/notmuch-mailmover
-
-  format:
-    name: cargo fmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
-        with:
-          components: rustfmt
-      - name: Rustfmt Check
-        uses: actions-rust-lang/rustfmt@4066006ec54a31931b9b1fddfd38f2fdf2d27143 # v1
-
-  lint:
-    name: cargo clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
-        with:
-          components: clippy
-      - name: Install deps
-        run: sudo .ci/install-deps.sh
-      - run: cargo clippy
+          path: result/bin/notmuch-mailmover
 
   coverage:
     runs-on: ubuntu-latest
@@ -63,12 +41,3 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           files: lcov.info
-
-  nix:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - name: Install Nix
-        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
-      - name: Build with Nix
-        run: nix build
