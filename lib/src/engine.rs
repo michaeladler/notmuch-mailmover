@@ -54,6 +54,41 @@ pub fn plan_moves<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>
     }
 }
 
+/// Searches the messages of `rule`, restricted to `rule.prefix`.
+///
+/// `guard` is ANDed in front of the rule's query, so callers own the `folder:`
+/// exclusion and, in [`MatchMode::First`], the queries of earlier rules. The
+/// prefix is applied as a post-filter, like in [`plan_unique`], because `path:`
+/// is not reliable enough for that.
+fn search_rule(
+    cfg: &impl Config,
+    repo: &dyn Repo,
+    rule: &Rule,
+    guard: &str,
+) -> Result<Vec<PathBuf>> {
+    let mut query_str = String::with_capacity(256);
+    if !guard.is_empty() {
+        write!(query_str, "{guard} AND ")?;
+    }
+    write!(query_str, "({})", rule.query)?;
+    if let Some(days) = cfg.max_age_days() {
+        write!(query_str, " AND date:\"{days}_days\"..")?;
+    }
+    debug!("using query: {query_str}");
+    let messages = repo.search_messages(&query_str)?;
+    Ok(match &rule.prefix {
+        Some(prefix) => {
+            let prefix = Path::new(cfg.maildir()).join(prefix);
+            debug!("using prefix: {prefix:?}");
+            filter_by_prefix(&messages, &prefix)
+        }
+        None => {
+            debug!("no prefix");
+            messages
+        }
+    })
+}
+
 fn plan_unique<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
     let mut moves = HashMap::new();
     let n = cfg.rules().len();
@@ -114,20 +149,8 @@ fn plan_unique<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
     }
 
     for rule in cfg.rules() {
-        let mut query_str = format!("NOT folder:\"{}\" AND ({})", rule.folder, rule.query);
-        if let Some(days) = cfg.max_age_days() {
-            write!(query_str, " AND date:\"{days}_days\"..")?;
-        }
-        debug!("using query: {query_str}");
-        let all_messages = repo.search_messages(&query_str)?;
-        let messages = if let Some(pre) = &rule.prefix {
-            let prefix = Path::new(cfg.maildir()).join(pre);
-            debug!("using prefix: {prefix:?}");
-            filter_by_prefix(&all_messages, &prefix)
-        } else {
-            debug!("No prefix");
-            all_messages
-        };
+        let guard = format!("NOT folder:\"{}\"", rule.folder);
+        let messages = search_rule(cfg, repo, rule, &guard)?;
         for filename in messages {
             debug!("processing {:?}", filename.to_str());
             if let Some(old) = moves.insert(filename, rule.folder.as_str()) {
@@ -148,16 +171,16 @@ fn plan_first<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
     // exclude previous rules and folders
     let mut exclude = String::with_capacity(32768);
     for rule in cfg.rules() {
-        let mut query_str = format!("(NOT folder:\"{}\") AND ({})", rule.folder, rule.query);
+        let mut guard = format!("(NOT folder:\"{}\")", rule.folder);
         if !exclude.is_empty() {
-            write!(query_str, " AND ({exclude})")?;
+            write!(guard, " AND ({exclude})")?;
         }
-        if let Some(days) = cfg.max_age_days() {
-            write!(query_str, " AND date:\"{days}_days\"..")?;
-        }
-
-        let messages = repo.search_messages(&query_str)?;
-        debug!("query '{}' returned {} messages", query_str, messages.len());
+        let messages = search_rule(cfg, repo, rule, &guard)?;
+        debug!(
+            "query with guard '{}' returned {} messages",
+            guard,
+            messages.len()
+        );
         for msg in messages {
             let fname = msg
                 .file_name()
@@ -178,12 +201,8 @@ fn plan_first<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
 fn plan_all<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
     let mut moves = HashMap::new();
     for rule in cfg.rules() {
-        let mut query_str = format!("({})", rule.query);
-        if let Some(days) = cfg.max_age_days() {
-            write!(query_str, " AND date:\"{days}_days\"..")?;
-        }
-        let messages = repo.search_messages(&query_str)?;
-        debug!("query '{}' returned {} messages", query_str, messages.len());
+        let messages = search_rule(cfg, repo, rule, "")?;
+        debug!("query for rule {rule} returned {} messages", messages.len());
         for msg in messages {
             let fname = msg
                 .file_name()
@@ -234,10 +253,10 @@ pub struct Rule {
     /// notmuch query selecting the messages, e.g. `tag:trash and not tag:sent`.
     pub query: String,
     /// Restricts the rule to messages whose path starts with
-    /// `<maildir>/<prefix>`. Useful to disambiguate the same query per mailbox
-    /// in [`MatchMode::Unique`], which bypasses the limits of `folder:` and
-    /// `path:` matching. Compared per path component, so `mailbox1` does not
-    /// match `mailbox10`.
+    /// `<maildir>/<prefix>`, in every [`MatchMode`]. Useful to disambiguate the
+    /// same query per mailbox in [`MatchMode::Unique`], which bypasses the
+    /// limits of `folder:` and `path:` matching. Compared per path component, so
+    /// `mailbox1` does not match `mailbox10`.
     pub prefix: Option<String>,
 }
 
@@ -505,6 +524,37 @@ mod tests {
 
         assert_eq!("mailbox1/Trash", folder1);
         assert_eq!("mailbox2/Trash", folder2);
+    }
+
+    #[test]
+    fn prefix_is_honored_in_first_and_all_mode() {
+        for mode in [MatchMode::First, MatchMode::All] {
+            let cfg = TestConfig {
+                rule_match_mode: Some(mode),
+                rules: vec![Rule {
+                    folder: "mailbox1/Trash".to_string(),
+                    query: "tag:trash".to_string(),
+                    prefix: Some("mailbox1".to_string()),
+                }],
+                ..Default::default()
+            };
+
+            let mut repo: DummyRepo = Default::default();
+            let query = match mode {
+                MatchMode::First => "(NOT folder:\"mailbox1/Trash\") AND (tag:trash)",
+                _ => "(tag:trash)",
+            };
+            repo.add_mail(query.to_string(), "~/mail/mailbox1/some.mail".to_string());
+            repo.add_mail(query.to_string(), "~/mail/mailbox2/some.mail".to_string());
+
+            let moves = plan_moves(&cfg, &repo).unwrap();
+            assert_eq!(
+                1,
+                moves.len(),
+                "{mode:?} must return only the mail under the prefix: {moves:?}"
+            );
+            assert!(moves.contains_key(Path::new("~/mail/mailbox1/some.mail")));
+        }
     }
 
     #[test]
