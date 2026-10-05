@@ -103,9 +103,8 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
     let maildir = shellexpand::full(&cfg.maildir)?;
     cfg.maildir = maildir.to_string();
 
-    if let Some(cfg_path) = cfg.notmuch_config {
-        let path = shellexpand::full(&cfg_path)?;
-        cfg.notmuch_config = Some(path.to_string());
+    if let Some(p) = &mut cfg.notmuch_config {
+        *p = shellexpand::full(p)?.to_string();
     }
 
     Ok(cfg)
