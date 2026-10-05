@@ -86,7 +86,8 @@ pub fn apply_actions(
 /// Construct a new filename, composed of a made-up ID and the flags part of the original filename.
 fn get_new_name(basename: &OsStr) -> String {
     let mut result = Uuid::new_v4().to_string();
-    let parts: Vec<&str> = basename.to_str().unwrap().split(':').collect();
+    let basename = basename.to_string_lossy();
+    let parts: Vec<&str> = basename.split(':').collect();
     let n = parts.len();
     if n > 1 {
         let flags = parts[n - 1];
@@ -164,6 +165,19 @@ mod tests {
         assert_eq!(1, names.len());
         assert!(names[0].ends_with(":2,S"), "flags kept: {}", names[0]);
         assert!(Uuid::parse_str(names[0].split(':').next().unwrap()).is_ok());
+    }
+
+    #[test]
+    fn get_new_name_handles_non_utf8_basename() {
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            let basename = OsStr::from_bytes(b"1234.mail\xff:2,S");
+            let new_name = get_new_name(basename);
+            let parts: Vec<&str> = new_name.split(':').collect();
+            assert_eq!(2, parts.len());
+            assert_eq!("2,S", parts[1]);
+        }
     }
 
     #[test]
