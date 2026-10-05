@@ -1,9 +1,13 @@
 use std::fs::{self, File};
-use std::{io::BufReader, path::PathBuf};
+use std::{
+    io::BufReader,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context, Result, anyhow};
 use directories::BaseDirs;
 use log::debug;
+#[cfg(feature = "lua")]
 use mlua::{Lua, LuaSerdeExt};
 use serde::{Deserialize, Serialize};
 
@@ -58,44 +62,40 @@ pub fn load_or_create_config(fname: &Option<PathBuf>) -> Result<Config> {
     let bd = BaseDirs::new().context("could not determine config directory")?;
     let basedir = bd.config_dir().join("notmuch-mailmover");
     let default_cfg_path = basedir.join("config.yaml");
-    let default_lua_path = basedir.join("config.lua");
 
     let fname = match fname {
         Some(fname) => fname.clone(),
-        None => match (default_cfg_path.exists(), default_lua_path.exists()) {
-            (true, true) => {
-                return Err(anyhow!(
-                    "Both {} and {} exist, please remove one",
-                    default_cfg_path.to_string_lossy(),
-                    default_lua_path.to_string_lossy(),
-                ));
+        #[cfg(feature = "lua")]
+        None => {
+            let lua_path = basedir.join("config.lua");
+            match (default_cfg_path.exists(), lua_path.exists()) {
+                (true, true) => {
+                    return Err(anyhow!(
+                        "Both {} and {} exist, please remove one",
+                        default_cfg_path.to_string_lossy(),
+                        lua_path.to_string_lossy(),
+                    ));
+                }
+                (true, false) => default_cfg_path,
+                (false, true) => lua_path,
+                (false, false) => {
+                    write_default_cfg(&default_cfg_path)?;
+                    default_cfg_path
+                }
             }
-            (true, false) => default_cfg_path,
-            (false, true) => default_lua_path,
-            (false, false) => {
-                fs::create_dir_all(&basedir)?;
-                let f = File::create(&default_cfg_path)?;
-                let default_cfg: Config = Default::default();
-                yaml_serde::to_writer(f, &default_cfg)?;
-                default_cfg_path
+        }
+        #[cfg(not(feature = "lua"))]
+        None => {
+            if !default_cfg_path.exists() {
+                write_default_cfg(&default_cfg_path)?;
             }
-        },
+            default_cfg_path
+        }
     };
     debug!("loading config {fname:?}");
 
     let mut cfg: Config = if fname.extension().is_some_and(|ext| ext == "lua") {
-        let lua = Lua::new();
-        let moduledir = fname
-            .parent()
-            .filter(|p| !p.as_os_str().is_empty())
-            .unwrap_or(&basedir)
-            .to_string_lossy();
-        lua.load(format!(
-            "package.path = package.path .. ';{moduledir}/?.lua;{moduledir}/?/init.lua;;'"
-        ))
-        .exec()?;
-        let val = lua.load(fname.clone()).eval()?;
-        lua.from_value(val)?
+        load_lua(&fname, &basedir)?
     } else {
         let f = File::open(&fname)?;
         let reader = BufReader::new(f);
@@ -110,4 +110,34 @@ pub fn load_or_create_config(fname: &Option<PathBuf>) -> Result<Config> {
     }
 
     Ok(cfg)
+}
+
+fn write_default_cfg(path: &Path) -> Result<()> {
+    fs::create_dir_all(path.parent().expect("config path has no parent"))?;
+    yaml_serde::to_writer(File::create(path)?, &Config::default())?;
+    Ok(())
+}
+
+#[cfg(feature = "lua")]
+fn load_lua(fname: &Path, basedir: &Path) -> Result<Config> {
+    let lua = Lua::new();
+    let moduledir = fname
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(basedir)
+        .to_string_lossy();
+    lua.load(format!(
+        "package.path = package.path .. ';{moduledir}/?.lua;{moduledir}/?/init.lua;;'"
+    ))
+    .exec()?;
+    let val = lua.load(fname).eval()?;
+    Ok(lua.from_value(val)?)
+}
+
+#[cfg(not(feature = "lua"))]
+fn load_lua(fname: &Path, _: &Path) -> Result<Config> {
+    Err(anyhow!(
+        "{} needs Lua support, rebuild with `--features lua`",
+        fname.display()
+    ))
 }

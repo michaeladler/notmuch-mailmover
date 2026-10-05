@@ -11,14 +11,14 @@ For example, you can move all mails tagged as `trash` to the `Trash` folder.
 
 Some use-cases are:
 
-* delete mail from IMAP server (e.g. move trash mail to a non-synced folder and let offlineimap/mbsync do the rest)
-* sync your notmuch tags across devices by using notmuch-mailmover in combination with offlineimap/mbsync
+- delete mail from IMAP server (e.g. move trash mail to a non-synced folder and let offlineimap/mbsync do the rest)
+- sync your notmuch tags across devices by using notmuch-mailmover in combination with offlineimap/mbsync
   (this is similarly to [muchsync](http://www.muchsync.org/) but easier to setup since you don't need a muchsync server)
-* purge old mails from the IMAP server (by moving them out of synced folders)
+- purge old mails from the IMAP server (by moving them out of synced folders)
 
 ## Installation
 
-Only Linux is tested, but Windows and Mac *should* work as well.
+Only Linux is tested, but Windows and Mac _should_ work as well.
 
 ### Arch Linux
 
@@ -41,13 +41,15 @@ Otherwise, you have to build from source. You need the following build dependenc
 
 - Rust
 - libnotmuch-dev
-- liblua5.4-dev
+- liblua5.4-dev (only with the `lua` feature, enabled by default)
 
 Then run
 
 ```bash
 cargo install --git 'https://github.com/michaeladler/notmuch-mailmover/'
 ```
+
+Building with `--no-default-features` drops Lua config support (and the liblua build dependency).
 
 ## Setup
 
@@ -73,9 +75,9 @@ search terms.
 
 The provided [config.yaml](./example/config.yaml) does the following:
 
-* move mails tagged as `trash` to folder `Trash`
-* move mails tagged as `sent` to folder `Sent`
-* move mails tagged as `archive` to folder `Archive`
+- move mails tagged as `trash` to folder `Trash`
+- move mails tagged as `sent` to folder `Sent`
+- move mails tagged as `archive` to folder `Archive`
 
 See [config_first.yaml](./example/config_first.yaml) for a different approach (using the `first` strategy for `rule_match_mode`).
 
@@ -90,6 +92,7 @@ runs may do different things.
 
 This is noticeable with queries containing `folder:` or `path:` search terms.
 Indeed, given the following mail directory:
+
 ```
 .
 ├── left
@@ -99,6 +102,7 @@ Indeed, given the following mail directory:
 ```
 
 and the following configuration:
+
 ```
 rules:
     - folder = right
@@ -116,5 +120,5 @@ terms.
 ## Similar Projects
 
 This work is inspired by [afew's Mailmover plugin](https://github.com/afewmail/afew/blob/master/afew/MailMover.py)
-but doesn't require you to setup rules for each folder *individually*. Instead, notmuch-mailmover applies your rules
-*once* to all folders (so it may be easier to configure if you have many folders).
+but doesn't require you to setup rules for each folder _individually_. Instead, notmuch-mailmover applies your rules
+_once_ to all folders (so it may be easier to configure if you have many folders).
