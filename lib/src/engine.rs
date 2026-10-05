@@ -350,7 +350,6 @@ mod tests {
     #[derive(Clone)]
     struct TestConfig {
         maildir: String,
-        rename: bool,
         max_age_days: Option<u32>,
         rules: Vec<Rule>,
         rule_match_mode: MatchMode,
@@ -360,7 +359,6 @@ mod tests {
         fn default() -> Self {
             Self {
                 maildir: "~/mail".to_string(),
-                rename: false,
                 max_age_days: None,
                 rules: Vec::new(),
                 rule_match_mode: MatchMode::Unique,
