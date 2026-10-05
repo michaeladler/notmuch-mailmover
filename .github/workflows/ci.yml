@@ -13,6 +13,7 @@ jobs:
         run: sudo .ci/install-deps.sh
       - run: cargo build --release
       - run: cargo test --all-features
+      - run: cargo test -p notmuch-mailmover-lib --no-default-features
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: notmuch-mailmover

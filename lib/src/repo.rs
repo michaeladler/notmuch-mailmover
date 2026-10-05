@@ -5,7 +5,8 @@ use std::path::PathBuf;
 ///
 /// The rule engine only ever asks questions in notmuch query syntax; it never
 /// parses or rewrites them, so an implementation must evaluate the full syntax
-/// (as [`notmuch::Database`] does) rather than, say, match tags literally.
+/// (as `notmuch::Database` does, with the `notmuch` feature) rather than, say,
+/// match tags literally.
 pub trait Repo {
     /// Returns the file of every message matching `query`.
     ///
@@ -14,6 +15,24 @@ pub trait Repo {
     fn search_messages(&self, query: &str) -> Result<Vec<PathBuf>>;
 }
 
+/// With the `notmuch` feature, a `notmuch::Database` is a `Repo` out of the box:
+///
+/// ```no_run
+/// # use anyhow::Result;
+/// # use std::path::PathBuf;
+/// # use nm_mailmover::repo::Repo;
+/// # fn main() -> Result<()> {
+/// let db = notmuch::Database::open_with_config(
+///     None::<&str>,
+///     notmuch::DatabaseMode::ReadOnly,
+///     None::<&String>,
+///     None,
+/// )?;
+/// let files: Vec<PathBuf> = db.search_messages("tag:trash")?;
+/// # Ok(())
+/// # }
+/// ```
+#[cfg(feature = "notmuch")]
 impl Repo for notmuch::Database {
     fn search_messages(&self, query: &str) -> Result<Vec<PathBuf>> {
         let nm_query = self.create_query(query)?;

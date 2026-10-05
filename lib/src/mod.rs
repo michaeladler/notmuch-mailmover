@@ -10,7 +10,7 @@
 //! Both phases are driven by a caller-supplied [`engine::Config`], so this crate
 //! holds no configuration file of its own; the binary owns YAML/Lua loading.
 //! Queries run through the [`repo::Repo`] trait, implemented for
-//! [`notmuch::Database`] but replaceable, e.g. by tests.
+//! `notmuch::Database` but replaceable, e.g. by tests.
 //!
 //! Note that applying rules is not idempotent: queries built from `folder:` or
 //! `path:` can select a different set of messages on the next run, because the
@@ -22,6 +22,7 @@
 //! use nm_mailmover::{
 //!     action,
 //!     engine::{self, Config, MatchMode, Rule},
+//!     repo::Repo,
 //! };
 //!
 //! struct MyConfig {
@@ -56,14 +57,17 @@
 //!     }],
 //! };
 //!
-//! let db = notmuch::Database::open_with_config(
-//!     None::<&str>,
-//!     notmuch::DatabaseMode::ReadOnly,
-//!     None::<&String>,
-//!     None,
-//! )?;
+//! // Any `Repo` works; `notmuch::Database` implements it with the `notmuch`
+//! // feature.
+//! struct MyRepo;
 //!
-//! let moves = engine::plan_moves(&cfg, &db)?;
+//! impl Repo for MyRepo {
+//!     fn search_messages(&self, query: &str) -> anyhow::Result<Vec<std::path::PathBuf>> {
+//!         Ok(Vec::new())
+//!     }
+//! }
+//!
+//! let moves = engine::plan_moves(&cfg, &MyRepo)?;
 //! action::move_files(&cfg, false, &moves)?;
 //! # Ok::<(), anyhow::Error>(())
 //! ```
