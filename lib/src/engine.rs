@@ -15,18 +15,13 @@ use crate::repo::Repo;
 /// source path so a run is reproducible.
 pub type Moves<'a> = Vec<(PathBuf, &'a str)>;
 
+/// `path -> folder` per message, unsorted.
+type Assigned<'a> = HashMap<PathBuf, &'a str>;
+
 /// Adds `path -> folder` to `moves`, replacing an existing assignment, and
 /// returns the folder `path` had before (if any).
-// ponytail: linear scan per insert, O(n^2) over all messages. Fine for maildir
-// sizes; use a sorted Vec + binary search if a run ever exceeds ~10k messages.
-fn assign<'a>(moves: &mut Moves<'a>, path: PathBuf, folder: &'a str) -> Option<&'a str> {
-    match moves.iter_mut().find(|(p, _)| *p == path) {
-        Some((_, old)) => Some(std::mem::replace(old, folder)),
-        None => {
-            moves.push((path, folder));
-            None
-        }
-    }
+fn assign<'a>(moves: &mut Assigned<'a>, path: PathBuf, folder: &'a str) -> Option<&'a str> {
+    moves.insert(path, folder)
 }
 
 /// An empty result over a non-empty input usually means the prefix does not
@@ -77,11 +72,12 @@ fn filter_by_prefix(messages: &[PathBuf], prefix: &Path) -> Vec<PathBuf> {
 /// overlap or assign one message to two folders.
 pub fn plan_moves<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
     debug!("planning moves");
-    let mut moves = match cfg.rule_match_mode() {
+    let assigned = match cfg.rule_match_mode() {
         MatchMode::Unique => plan_unique(cfg, repo),
         MatchMode::First => plan_first(cfg, repo),
         MatchMode::All => plan_all(cfg, repo),
     }?;
+    let mut moves: Moves<'a> = assigned.into_iter().collect();
     moves.sort_by(|(a, _), (b, _)| a.cmp(b));
     Ok(moves)
 }
@@ -121,8 +117,8 @@ fn search_rule(
     })
 }
 
-fn plan_unique<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
-    let mut moves = Moves::new();
+fn plan_unique<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Assigned<'a>> {
+    let mut moves = Assigned::new();
     let rules = cfg.rules();
     if rules.len() > 1 {
         debug!("checking if any two rules overlap");
@@ -187,8 +183,8 @@ fn plan_unique<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
     Ok(moves)
 }
 
-fn plan_first<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
-    let mut moves = Moves::new();
+fn plan_first<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Assigned<'a>> {
+    let mut moves = Assigned::new();
     // exclude previous rules and folders
     let mut exclude = String::with_capacity(32768);
     for rule in cfg.rules() {
@@ -219,8 +215,8 @@ fn plan_first<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
     Ok(moves)
 }
 
-fn plan_all<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
-    let mut moves = Moves::new();
+fn plan_all<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Assigned<'a>> {
+    let mut moves = Assigned::new();
     for rule in cfg.rules() {
         // guard against the destination folder too, else every run re-picks mail already
         // moved there and, with rename, churns its UUID
