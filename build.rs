@@ -1,9 +1,9 @@
 use clap::CommandFactory;
-use clap_complete::{generate_to, Shell};
+use clap_complete::{Shell, generate_to};
 use clap_mangen::Man;
-use flate2::write::GzEncoder;
 use flate2::Compression;
-use std::fs::{create_dir_all, File};
+use flate2::write::GzEncoder;
+use std::fs::{File, create_dir_all};
 use std::path::Path;
 
 include!("src/cli.rs");

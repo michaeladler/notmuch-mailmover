@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{crate_authors, Parser, ValueEnum};
+use clap::{Parser, ValueEnum, crate_authors};
 
 use git_version::git_version;
 

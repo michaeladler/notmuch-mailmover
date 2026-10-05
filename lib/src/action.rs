@@ -4,12 +4,31 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use log::{debug, info, trace, warn};
 use uuid::Uuid;
 
 use crate::engine::Config;
 
+/// Moves the files collected by [`crate::engine::apply_rules`].
+///
+/// `actions` maps a message file to a destination folder relative to
+/// [`Config::maildir`]. Each file is moved to `<maildir>/<folder>/<mailbox>`,
+/// where `<mailbox>` is the file's current parent directory name, so nested
+/// mailboxes keep their subtree. With [`Config::rename`] set, the file gets a
+/// new unique name that keeps the Maildir flags suffix, which mbsync needs.
+///
+/// Messages already at their destination are skipped. With `dry_run`, only the
+/// intended moves are logged and nothing is written. Missing parent
+/// directories are created. A file that has disappeared (not yet indexed by
+/// `notmuch new`) is logged as a warning and skipped, so one stale entry does
+/// not abort the run.
+///
+/// # Errors
+///
+/// Returns an error if a path has no file or mailbox component, or if creating
+/// the destination directory or renaming a file fails. Moves performed before
+/// the failure are kept.
 pub fn apply_actions(
     cfg: &impl Config,
     dry_run: bool,

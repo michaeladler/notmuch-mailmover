@@ -1,7 +1,7 @@
 use std::fmt::Write as _;
 use std::{collections::HashMap, path::Path, path::PathBuf};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use log::{debug, error, warn};
 use serde::{Deserialize, Serialize};
 
@@ -20,9 +20,33 @@ fn filter_messages_with_prefix(messages: &[PathBuf], prefix: &PathBuf) -> Vec<Pa
         .collect()
 }
 
-/// Apply the given rules to the mails in the repository.
-/// The result is a HashMap which is assigns messages (files) to their new destination folders.
-/// Note that no messages are actually moved at this stage.
+/// Assigns each matching message file to its destination folder.
+///
+/// The result maps the message file (as returned by
+/// [`MailRepo::search_message`], i.e. usually absolute) to a destination folder
+/// relative to the maildir. No file is touched; pass the result to
+/// [`crate::action::apply_actions`] to move them.
+///
+/// Every query is wrapped in `NOT folder:"<folder>" AND (...)`, so messages
+/// already sitting in their destination are not returned and stay put. When
+/// [`Config::max_age_days`] is set, `date:"<days>_days"..` is appended, limiting
+/// the search to recent messages.
+///
+/// [`Config::rule_match_mode`] selects between three strategies:
+///
+/// * [`MatchMode::Unique`] (the default): rules must be pairwise disjoint. All
+///   pairs are probed for overlap first and an [`anyhow::Error`] is returned
+///   before anything moves, if two queries can match the same message.
+/// * [`MatchMode::First`]: the first matching rule wins. Later rules get
+///   `AND NOT (<earlier queries>)` appended, so rule order decides.
+/// * [`MatchMode::All`]: every matching rule applies, in order. A message
+///   matched twice is only moved once, to the last matching folder, and a
+///   warning is logged.
+///
+/// # Errors
+///
+/// Returns an error if a query fails, or (in [`MatchMode::Unique`]) if two rules
+/// overlap or assign one message to two folders.
 pub fn apply_rules<'a>(
     cfg: &'a impl Config,
     repo: &dyn MailRepo,
@@ -185,18 +209,43 @@ fn apply_all<'a>(cfg: &'a impl Config, repo: &dyn MailRepo) -> Result<HashMap<Pa
 }
 
 /// Input contract for the rule engine and the file mover.
+///
+/// Implement this over your own configuration type; the engine and the mover
+/// read everything through it and never look at a config file themselves.
 pub trait Config {
+    /// Root of the maildir. Rule prefixes are relative to it, and destinations
+    /// are resolved below it. May contain `~`, which the caller is expected to
+    /// have expanded already.
     fn maildir(&self) -> &str;
+
+    /// If set, only messages newer than this many days are considered. Appended
+    /// to every query as `date:"<days>_days"..`.
     fn max_age_days(&self) -> Option<u32>;
+
+    /// Whether moved files get a fresh unique name, keeping only the Maildir
+    /// flags suffix. Required by mbsync; turn off to keep original filenames.
     fn rename(&self) -> bool;
+
+    /// The rules to apply, in the order they are evaluated.
     fn rules(&self) -> &[Rule];
+
+    /// Which overlap strategy to use. `None` means [`MatchMode::Unique`].
     fn rule_match_mode(&self) -> Option<MatchMode>;
 }
 
+/// A single "move messages matching `query` into `folder`" rule.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Rule {
+    /// Destination Maildir folder, relative to the maildir. May contain
+    /// subfolders (`mailbox1/Trash`).
     pub folder: String,
+    /// notmuch query selecting the messages, e.g. `tag:trash and not tag:sent`.
     pub query: String,
+    /// Restricts the rule to messages whose path starts with
+    /// `<maildir>/<prefix>`. Useful to disambiguate the same query per mailbox
+    /// in [`MatchMode::Unique`], which bypasses the limits of `folder:` and
+    /// `path:` matching. Compared per path component, so `mailbox1` does not
+    /// match `mailbox10`.
     pub prefix: Option<String>,
 }
 
@@ -215,11 +264,17 @@ impl std::fmt::Display for Rule {
     }
 }
 
+/// How to resolve messages matched by more than one rule.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum MatchMode {
+    /// Rules must be pairwise disjoint; ambiguous rules are an error.
+    /// Explicit, but requires verbose queries.
     Unique,
+    /// First matching rule wins; rule order is significant.
     First,
+    /// Every matching rule applies in order; a message matched twice ends up in
+    /// the folder of the last match. Concise, but easy to misconfigure.
     All,
 }
 
@@ -352,7 +407,10 @@ mod tests {
             let actions = apply_rules(cfg, &repo);
             assert!(actions.is_err());
             let err = actions.unwrap_err();
-            assert_eq!("Ambiguous rule! Message already assigned to folder Trash, cannot assign to folder Deleted", err.to_string());
+            assert_eq!(
+                "Ambiguous rule! Message already assigned to folder Trash, cannot assign to folder Deleted",
+                err.to_string()
+            );
         }
     }
 

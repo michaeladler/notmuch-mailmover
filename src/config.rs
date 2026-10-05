@@ -1,7 +1,7 @@
 use std::fs::{self, File};
 use std::{io::BufReader, path::PathBuf};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use directories::BaseDirs;
 use log::debug;
 use mlua::{Lua, LuaSerdeExt};
