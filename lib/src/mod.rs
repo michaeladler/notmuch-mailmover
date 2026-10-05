@@ -37,9 +37,6 @@
 //!     fn max_age_days(&self) -> Option<u32> {
 //!         None
 //!     }
-//!     fn rename(&self) -> bool {
-//!         false
-//!     }
 //!     fn rules(&self) -> &[Rule] {
 //!         &self.rules
 //!     }
@@ -68,7 +65,7 @@
 //! }
 //!
 //! let moves = engine::plan_moves(&cfg, &MyRepo)?;
-//! action::move_files(cfg.maildir(), cfg.rename(), false, &moves)?;
+//! action::move_files(cfg.maildir(), false, false, &moves)?;
 //! # Ok::<(), nm_mailmover::Error>(())
 //! ```
 

@@ -45,9 +45,7 @@ impl engine::Config for Config {
     fn max_age_days(&self) -> Option<u32> {
         self.max_age_days
     }
-    fn rename(&self) -> bool {
-        self.rename
-    }
+
     fn rules(&self) -> &[Rule] {
         &self.rules
     }

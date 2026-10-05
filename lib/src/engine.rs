@@ -249,10 +249,6 @@ pub trait Config {
     /// to every query as `date:"<days>_days"..`.
     fn max_age_days(&self) -> Option<u32>;
 
-    /// Whether moved files get a fresh unique name, keeping only the Maildir
-    /// flags suffix. Required by mbsync; turn off to keep original filenames.
-    fn rename(&self) -> bool;
-
     /// The rules to apply, in the order they are evaluated.
     fn rules(&self) -> &[Rule];
 
@@ -379,9 +375,7 @@ mod tests {
         fn max_age_days(&self) -> Option<u32> {
             self.max_age_days
         }
-        fn rename(&self) -> bool {
-            self.rename
-        }
+
         fn rules(&self) -> &[Rule] {
             &self.rules
         }
