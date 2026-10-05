@@ -115,7 +115,12 @@ fn apply_unique<'a>(
         for filename in messages {
             debug!("processing {:?}", filename.to_str());
             if let Some(old) = actions.insert(filename, rule.folder.as_str()) {
-                return Err(anyhow!("Ambiguous rule! Message already assigned to folder {}, cannot assign to folder {}", old, rule.folder));
+                let msg = format!(
+                    "Ambiguous rule! Message already assigned to folder {old}, \
+                     cannot assign to folder {}",
+                    rule.folder
+                );
+                return Err(anyhow!(msg));
             }
         }
     }
