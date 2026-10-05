@@ -127,7 +127,7 @@ fn apply_first<'a>(cfg: &'a impl Config, repo: &dyn MailRepo) -> Result<HashMap<
     // exclude previous rules and folders
     let mut exclude = String::with_capacity(32768);
     for rule in cfg.rules() {
-        let mut query_str = format!("(NOT folder:{}) AND ({})", rule.folder, rule.query);
+        let mut query_str = format!("(NOT folder:\"{}\") AND ({})", rule.folder, rule.query);
         if !exclude.is_empty() {
             write!(query_str, " AND ({exclude})")?;
         }
@@ -416,7 +416,7 @@ mod tests {
 
         let mut repo: DummyRepo = Default::default();
         repo.add_mail(
-            "(NOT folder:Trash) AND (tag:trash)".to_string(),
+            "(NOT folder:\"Trash\") AND (tag:trash)".to_string(),
             "some.mail".to_string(),
         );
         let actions = apply_rules(&cfg, &repo).unwrap();
