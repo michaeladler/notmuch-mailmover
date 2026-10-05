@@ -28,10 +28,19 @@ pub fn apply_actions(
             .file_name()
             .ok_or_else(|| anyhow!("Failed to get filename from {}", src_file.to_string_lossy()))?;
 
+        // keep the original mailbox subtree, so nested folders move within it
+        let mailbox = src_file
+            .parent()
+            .and_then(|p| p.file_name())
+            .ok_or_else(|| {
+                anyhow!(
+                    "Failed to get mailbox name from {}",
+                    src_file.to_string_lossy()
+                )
+            })?;
+
         let db_path = PathBuf::from(cfg.maildir());
-        let mut dest_file = db_path
-            .join(folder)
-            .join(src_file.parent().unwrap().file_name().unwrap());
+        let mut dest_file = db_path.join(folder).join(mailbox);
         if cfg.rename() {
             dest_file.push(get_new_name(basename));
         } else {
@@ -91,6 +100,35 @@ mod tests {
     use regex::Regex;
 
     use super::*;
+    use crate::engine::{MatchMode, Rule};
+
+    struct TestCfg;
+
+    impl Config for TestCfg {
+        fn maildir(&self) -> &str {
+            "/tmp/mail"
+        }
+        fn max_age_days(&self) -> Option<u32> {
+            None
+        }
+        fn rename(&self) -> bool {
+            false
+        }
+        fn rules(&self) -> &[Rule] {
+            &[]
+        }
+        fn rule_match_mode(&self) -> Option<MatchMode> {
+            None
+        }
+    }
+
+    #[test]
+    fn bare_filename_is_an_error_not_a_panic() {
+        let mut actions = HashMap::new();
+        actions.insert(PathBuf::from("some.mail"), "Trash");
+        let err = apply_actions(&TestCfg, false, &actions).unwrap_err();
+        assert_eq!("Failed to get mailbox name from some.mail", err.to_string());
+    }
 
     #[test]
     fn get_new_name_test() {
