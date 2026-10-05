@@ -153,7 +153,9 @@ fn plan_unique<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
         let messages = search_rule(cfg, repo, rule, &guard)?;
         for filename in messages {
             debug!("processing {:?}", filename.to_str());
-            if let Some(old) = moves.insert(filename, rule.folder.as_str()) {
+            if let Some(old) = moves.insert(filename, rule.folder.as_str())
+                && old != rule.folder
+            {
                 let msg = format!(
                     "Ambiguous rule! Message already assigned to folder {old}, \
                      cannot assign to folder {}",
@@ -524,6 +526,37 @@ mod tests {
 
         assert_eq!("mailbox1/Trash", folder1);
         assert_eq!("mailbox2/Trash", folder2);
+    }
+
+    #[test]
+    fn same_folder_for_two_rules_is_not_ambiguous() {
+        let mut cfg: TestConfig = Default::default();
+        cfg.rule_match_mode = Some(MatchMode::Unique);
+        for (folder, query) in [("Trash", "tag:trash"), ("Trash", "tag:junk")] {
+            cfg.rules.push(Rule {
+                folder: folder.to_string(),
+                query: query.to_string(),
+                prefix: None,
+            });
+        }
+
+        let mut repo: DummyRepo = Default::default();
+        repo.add_mail(
+            "NOT folder:\"Trash\" AND (tag:trash)".to_string(),
+            "trash.mail".to_string(),
+        );
+        repo.add_mail(
+            "NOT folder:\"Trash\" AND (tag:junk)".to_string(),
+            "trash.mail".to_string(),
+        );
+
+        let moves = plan_moves(&cfg, &repo).unwrap();
+        assert_eq!(1, moves.len());
+        assert_eq!(
+            Some(&"Trash"),
+            moves.get(Path::new("trash.mail")),
+            "same destination from both rules is not ambiguous"
+        );
     }
 
     #[test]
