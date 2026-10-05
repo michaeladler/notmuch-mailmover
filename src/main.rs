@@ -17,11 +17,10 @@ fn main() -> Result<()> {
 
     let cfg = config::load_config(&opts.config)?;
     debug!("successfully loaded {cfg:?}");
-    let db_path: Option<String> = None;
 
     debug!("opening notmuch db");
     let db = notmuch::Database::open_with_config(
-        db_path,
+        None::<&str>,
         notmuch::DatabaseMode::ReadOnly,
         cfg.notmuch_config.as_ref(),
         None,
