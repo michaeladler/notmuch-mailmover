@@ -447,8 +447,6 @@ mod tests {
         let actions = apply_rules(&cfg, &repo).unwrap();
         assert_eq!(actions.len(), 2);
 
-        dbg!(&actions);
-
         let pb1 = PathBuf::from_str("~/mail/mailbox1/some.mail").unwrap();
         let pb2 = PathBuf::from_str("~/mail/mailbox2/some.mail").unwrap();
 
