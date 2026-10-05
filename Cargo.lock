@@ -661,7 +661,6 @@ dependencies = [
  "anyhow",
  "log",
  "notmuch",
- "regex",
  "serde",
  "uuid",
 ]

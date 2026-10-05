@@ -98,8 +98,6 @@ fn get_new_name(basename: &OsStr) -> String {
 
 #[cfg(test)]
 mod tests {
-    use regex::Regex;
-
     use super::*;
     use crate::engine::{MatchMode, Rule};
 
@@ -182,16 +180,14 @@ mod tests {
 
     #[test]
     fn get_new_name_test() {
-        let uuid_re =
-            Regex::new(r"\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b")
-                .unwrap();
+        let is_uuid = |s: &str| Uuid::parse_str(s).is_ok();
 
         {
             let fname = get_new_name(OsStr::new(
                 "1662362645_0.322365.foo,U=55582,FMD5=7e33429f656f1e6e9d79b29c3f82c57e:2,S",
             ));
             let parts: Vec<&str> = fname.split(':').collect();
-            assert!(uuid_re.is_match(parts[0]));
+            assert!(is_uuid(parts[0]));
             assert_eq!("2,S", parts[1]);
             assert_eq!(2, parts.len());
         }
@@ -201,7 +197,7 @@ mod tests {
                 "1662103908_2.328294.foo,U=55119,FMD5=7e33429f656f1e6e9d79b29c3f82c57e:2,RS",
             ));
             let parts: Vec<&str> = fname.split(':').collect();
-            assert!(uuid_re.is_match(parts[0]));
+            assert!(is_uuid(parts[0]));
             assert_eq!("2,RS", parts[1]);
             assert_eq!(2, parts.len());
         }
@@ -211,7 +207,7 @@ mod tests {
                 "1662103908_2.328294.foo,U=55119,FMD5=7e33429f656f1e6e9d79b29c3f82c57e:",
             ));
             let parts: Vec<&str> = fname.split(':').collect();
-            assert!(uuid_re.is_match(parts[0]));
+            assert!(is_uuid(parts[0]));
             assert_eq!("", parts[1]);
             assert_eq!(2, parts.len());
         }
@@ -221,7 +217,7 @@ mod tests {
                 "1662103908_2.328294.foo,U=55119,FMD5=7e33429f656f1e6e9d79b29c3f82c57e",
             ));
             let parts: Vec<&str> = fname.split(':').collect();
-            assert!(uuid_re.is_match(parts[0]));
+            assert!(is_uuid(parts[0]));
             assert_eq!(1, parts.len());
         }
     }
