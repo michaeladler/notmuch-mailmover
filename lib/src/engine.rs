@@ -226,7 +226,7 @@ pub enum MatchMode {
 #[cfg(test)]
 mod tests {
 
-    use std::{str::FromStr, vec};
+    use std::str::FromStr;
 
     #[derive(Debug, Default)]
     struct DummyRepo {
