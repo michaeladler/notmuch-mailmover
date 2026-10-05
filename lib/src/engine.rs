@@ -203,7 +203,10 @@ fn plan_first<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
 fn plan_all<'a>(cfg: &'a impl Config, repo: &dyn Repo) -> Result<Moves<'a>> {
     let mut moves = HashMap::new();
     for rule in cfg.rules() {
-        let messages = search_rule(cfg, repo, rule, "")?;
+        // guard against the destination folder too, else every run re-picks mail already
+        // moved there and, with rename, churns its UUID
+        let guard = format!("NOT folder:\"{}\"", rule.folder);
+        let messages = search_rule(cfg, repo, rule, &guard)?;
         debug!("query for rule {rule} returned {} messages", messages.len());
         for msg in messages {
             let fname = msg
@@ -478,7 +481,10 @@ mod tests {
         };
 
         let mut repo: DummyRepo = Default::default();
-        repo.add_mail("(tag:trash)".to_string(), "some.mail".to_string());
+        repo.add_mail(
+            "NOT folder:\"Deleted\" AND (tag:trash)".to_string(),
+            "some.mail".to_string(),
+        );
         let moves = plan_moves(&cfg, &repo).unwrap();
         assert_eq!(moves.len(), 1);
         let pb = PathBuf::from_str("some.mail").unwrap();
@@ -528,6 +534,36 @@ mod tests {
         assert_eq!("mailbox2/Trash", folder2);
     }
 
+    /// A message already sitting in the destination must not be planned again, or
+    /// every run hands it a fresh UUID and mbsync loses flag continuity.
+    #[test]
+    fn all_mode_skips_mail_already_in_destination() {
+        let cfg = TestConfig {
+            rule_match_mode: Some(MatchMode::All),
+            rules: vec![Rule {
+                folder: "Trash".to_string(),
+                query: "tag:trash".to_string(),
+                prefix: None,
+            }],
+            ..Default::default()
+        };
+
+        let mut repo: DummyRepo = Default::default();
+        // notmuch returns the mail only for the unguarded query, i.e. the mail is
+        // already in Trash and the guard is what keeps it out of the plan
+        repo.add_mail("(tag:trash)".to_string(), "~/mail/Trash/x.mail".to_string());
+        repo.add_mail(
+            "NOT folder:\"Trash\" AND (tag:trash)".to_string(),
+            "~/mail/INBOX/y.mail".to_string(),
+        );
+
+        let moves = plan_moves(&cfg, &repo).unwrap();
+        assert_eq!(
+            vec![PathBuf::from("~/mail/INBOX/y.mail")],
+            moves.keys().cloned().collect::<Vec<_>>()
+        );
+    }
+
     #[test]
     fn same_folder_for_two_rules_is_not_ambiguous() {
         let mut cfg: TestConfig = Default::default();
@@ -575,7 +611,7 @@ mod tests {
             let mut repo: DummyRepo = Default::default();
             let query = match mode {
                 MatchMode::First => "(NOT folder:\"mailbox1/Trash\") AND (tag:trash)",
-                _ => "(tag:trash)",
+                _ => "NOT folder:\"mailbox1/Trash\" AND (tag:trash)",
             };
             repo.add_mail(query.to_string(), "~/mail/mailbox1/some.mail".to_string());
             repo.add_mail(query.to_string(), "~/mail/mailbox2/some.mail".to_string());
