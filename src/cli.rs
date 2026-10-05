@@ -5,29 +5,26 @@ use clap::{crate_authors, Parser, ValueEnum};
 
 use git_version::git_version;
 
-pub const VERSION: &[u8] = remove_leading_v(
-    git_version!(
-        cargo_prefix = "",
-        prefix = "",
-        // Note that on the CLI, the v* needs to be in single quotes
-        // When passed here though there seems to be some magic quoting that happens.
-        args = ["--always", "--dirty=-dirty", "--match=v*", "--tags"]
-    )
-    .as_bytes(),
-);
+pub const VERSION: &str = remove_leading_v(git_version!(
+    cargo_prefix = "",
+    prefix = "",
+    // Note that on the CLI, the v* needs to be in single quotes
+    // When passed here though there seems to be some magic quoting that happens.
+    args = ["--always", "--dirty=-dirty", "--match=v*", "--tags"]
+));
 
-const fn remove_leading_v(bytes: &[u8]) -> &[u8] {
-    if !bytes.is_empty() && bytes[0] == b'v' {
-        konst::slice::slice_from(bytes, 1)
+const fn remove_leading_v(version: &'static str) -> &'static str {
+    if !version.is_empty() && version.as_bytes()[0] == b'v' {
+        konst::string::str_from(version, 1)
     } else {
-        bytes
+        version
     }
 }
 
 #[derive(Parser)]
 #[clap(
     name = "notmuch-mailmover",
-    version = str::from_utf8( VERSION).unwrap(),
+    version = VERSION,
     author = crate_authors!(),
 )]
 pub struct Cli {
