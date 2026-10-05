@@ -5,7 +5,7 @@ authors = ["Michael Adler <therisen06@gmail.com>"]
 description = "Rule engine and file mover for notmuch tagged mails"
 homepage = "https://github.com/michaeladler/notmuch-mailmover"
 license = "Apache-2.0"
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "nm_mailmover"
@@ -17,4 +17,3 @@ anyhow = "1.0.98"
 log = "0.4.27"
 notmuch = "0.8.0"
 serde = { version = "1.0", features = ["derive"] }
-

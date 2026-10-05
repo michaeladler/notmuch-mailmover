@@ -9,7 +9,7 @@ authors = ["Michael Adler <therisen06@gmail.com>"]
 description = "Move notmuch tagged mails into Maildir folders"
 homepage = "https://github.com/michaeladler/notmuch-mailmover"
 license = "Apache-2.0"
-edition = "2021"
+edition = "2024"
 
 [[bin]]
 name = "notmuch-mailmover"
