@@ -73,7 +73,7 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
                 fs::create_dir_all(&basedir)?;
                 let f = File::create(&default_cfg_path)?;
                 let default_cfg: Config = Default::default();
-                serde_yaml_ng::to_writer(f, &default_cfg)?;
+                yaml_serde::to_writer(f, &default_cfg)?;
                 &default_cfg_path
             }
         },
@@ -93,7 +93,7 @@ pub fn load_config(fname: &Option<PathBuf>) -> Result<Config> {
     } else {
         let f = File::open(fname)?;
         let reader = BufReader::new(f);
-        let cfg: Config = serde_yaml_ng::from_reader(reader)?;
+        let cfg: Config = yaml_serde::from_reader(reader)?;
         cfg
     };
 
