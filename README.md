@@ -51,6 +51,16 @@ cargo install --git 'https://github.com/michaeladler/notmuch-mailmover/'
 
 Building with `--no-default-features` drops Lua config support (and the liblua build dependency).
 
+## Tests
+
+```bash
+cargo test
+```
+
+The integration tests in [tests/](tests) generate a Maildir, index and tag it with a
+throwaway notmuch database, run the binary against that database and check where the mail ended up.
+They need the `notmuch` binary on `PATH`; the unit tests do not.
+
 ## Setup
 
 It's recommended to run `notmuch-mailmover` as part of your [notmuch pre-new hook](https://notmuch.readthedocs.io/en/latest/man5/notmuch-hooks.html).

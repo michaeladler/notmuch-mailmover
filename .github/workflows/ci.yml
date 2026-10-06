@@ -21,20 +21,18 @@ jobs:
           name: notmuch-mailmover
           path: result/bin/notmuch-mailmover
 
+# `nix flake check` above already runs the integration tests; they run again
+  # here to get coverage numbers.
   coverage:
     runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
-      - uses: taiki-e/install-action@e49978b799e49ff429d162b7a30601a569ab6538 # v2
-        with:
-          tool: cargo-llvm-cov
-      - name: Install deps
-        run: sudo .ci/install-deps.sh
+      - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
       - name: Generate code coverage
-        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+        # The devShell carries the toolchain and every build and test dependency.
+        run: nix develop --command cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6
         env:

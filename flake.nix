@@ -33,6 +33,7 @@
                 fileset = pkgs.lib.fileset.unions [
                   ./src
                   ./lib
+                  ./tests
                   ./Cargo.toml
                   ./Cargo.lock
                   ./deny.toml
@@ -78,9 +79,13 @@
             // {
               inherit cargoArtifacts;
 
-              nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
-                pkgs.installShellFiles
-              ];
+              # The integration tests shell out to the notmuch CLI; buildInputs
+              # are not on the PATH while the tests run.
+              nativeBuildInputs =
+                (commonArgs.nativeBuildInputs or [ ]) ++ [
+                  pkgs.installShellFiles
+                  pkgs.notmuch
+                ];
 
               postInstall = ''
                 installManPage share/notmuch-mailmover.1
@@ -139,6 +144,11 @@
             commonArgs
             // {
               inherit cargoArtifacts;
+              # The integration tests shell out to the notmuch CLI; buildInputs
+              # are not on the PATH while the tests run.
+              nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
+                pkgs.notmuch
+              ];
               partitions = 1;
               partitionType = "count";
               cargoNextestPartitionsExtraArgs = "--no-tests=pass";
@@ -218,11 +228,17 @@
             packages = [
               pkgs.notmuch
               pkgs.lua5_4
-              pkgs.markdown-link-check
+              pkgs.cargo-llvm-cov
               pkgs.zstd
               cargoDebugArtifacts
               reseedTarget
             ];
+
+            # cargo-llvm-cov wants llvm-profdata and llvm-cov, which nixpkgs
+            # ships outside the rustc sysroot, named by path. The version has to
+            # match the compiler's, hence rustc.llvmPackages.
+            env.LLVM_COV = "${pkgs.rustc.llvmPackages.llvm}/bin/llvm-cov";
+            env.LLVM_PROFDATA = "${pkgs.rustc.llvmPackages.llvm}/bin/llvm-profdata";
 
             shellHook = ''
               ${hydrate}
