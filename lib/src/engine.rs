@@ -257,7 +257,7 @@ pub trait Config {
 }
 
 /// A single "move messages matching `query` into `folder`" rule.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Rule {
     /// Destination Maildir folder, relative to the maildir. May contain
     /// subfolders (`mailbox1/Trash`).
