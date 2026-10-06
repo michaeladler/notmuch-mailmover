@@ -1,0 +1,18 @@
+# git-cliff generates the release notes; see .github/workflows/release.yml.
+[changelog]
+# The release title already names the version; git-cliff's default "All notable
+# changes" preamble would only repeat that.
+header = ""
+
+[git]
+# Renovate's lock-file commits ("flake.lock: Update") parse as conventional
+# commits, so the parsers below cannot see them as the chores they are.
+exclude_paths = ["flake.lock", "Cargo.lock"]
+# The `<!-- n -->` prefixes are how git-cliff orders the groups.
+commit_parsers = [
+  # Repo chores and docs/tests are no news for a user reading release notes.
+  { message = "^(chore|ci|docs|test)", skip = true },
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Bug fixes" },
+  { message = ".*", group = "<!-- 2 -->Others" },
+]

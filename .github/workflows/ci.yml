@@ -1,5 +1,14 @@
 name: ci
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    tags-ignore: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   nix:
     name: nix flake check

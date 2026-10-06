@@ -12,7 +12,13 @@
   };
 
   outputs =
-    { self, nixpkgs, crane, advisory-db, ... }:
+    {
+      self,
+      nixpkgs,
+      crane,
+      advisory-db,
+      ...
+    }:
     let
       systems = [
         "x86_64-linux"
@@ -64,7 +70,11 @@
     in
     {
       checks = forAllSystems (
-        { pkgs, src, commonArgs }:
+        {
+          pkgs,
+          src,
+          commonArgs,
+        }:
         let
           craneLib = crane.mkLib pkgs;
 
@@ -81,11 +91,10 @@
 
               # The integration tests shell out to the notmuch CLI; buildInputs
               # are not on the PATH while the tests run.
-              nativeBuildInputs =
-                (commonArgs.nativeBuildInputs or [ ]) ++ [
-                  pkgs.installShellFiles
-                  pkgs.notmuch
-                ];
+              nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
+                pkgs.installShellFiles
+                pkgs.notmuch
+              ];
 
               postInstall = ''
                 installManPage share/notmuch-mailmover.1
@@ -245,6 +254,14 @@
               echo "target/ hydrated: third-party dependencies pre-compiled for the dev profile."
               echo "Escape hatches: reseed-target, or unset CARGO_HOME to go back to crates.io."
             '';
+          };
+
+          ci = pkgs.mkShell {
+            nativeBuildInputs = [
+              pkgs.nfpm
+              pkgs.zstd
+              pkgs.git-cliff
+            ];
           };
         }
       );

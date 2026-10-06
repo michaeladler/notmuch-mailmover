@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://nfpm.goreleaser.com/schema.json
+
+name: notmuch-mailmover
+# Expanded by nfpm from the environment; see .github/workflows/release.yml.
+arch: ${PKG_ARCH}
+platform: linux
+version: ${PKG_VERSION}
+section: mail
+priority: extra
+maintainer: Michael Adler <therisen06@gmail.com>
+vendor: Michael Adler
+homepage: https://github.com/michaeladler/notmuch-mailmover
+description: move notmuch tagged mails into Maildir folders
+license: Apache-2.0
+depends:
+  - notmuch
+
+contents:
+  # Stage tree by the Build step of .github/workflows/release.yml; its layout
+  # already matches the distribution conventions (bin/, share/man, ...), so
+  # there is no per-file list to keep in sync.
+  - src: dist/tree/bin
+    dst: /usr/bin
+    type: tree
+  - src: dist/tree/share
+    dst: /usr/share
+    type: tree
+
+  # example configurations
+  - src: example/
+    dst: /usr/share/doc/notmuch-mailmover/example/
+
+  # zsh completion for Debian
+  - src: /usr/share/zsh/site-functions/_notmuch-mailmover
+    dst: /usr/share/zsh/vendor-completions/_notmuch-mailmover
+    type: symlink
+    packager: deb

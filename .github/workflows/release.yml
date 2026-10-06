@@ -2,32 +2,113 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  release:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04
+            arch: amd64
+          - runner: ubuntu-26.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
       - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2
 
       - name: Install build deps
-        run: sudo .ci/install-deps.sh
+        run: sudo apt-get update -q && sudo apt-get install --no-install-recommends -y libnotmuch-dev liblua5.4-dev
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
+      - name: Build
+        run: |
+          cargo build --release --locked --features vendored
+          install -Dm755 target/release/notmuch-mailmover dist/tree/bin/notmuch-mailmover
+          install -Dm644 share/notmuch-mailmover.1 dist/tree/share/man/man1/notmuch-mailmover.1
+          install -Dm644 share/notmuch-mailmover.bash dist/tree/share/bash-completion/completions/notmuch-mailmover
+          install -Dm644 share/notmuch-mailmover.fish dist/tree/share/fish/vendor_completions.d/notmuch-mailmover.fish
+          install -Dm644 share/_notmuch-mailmover dist/tree/share/zsh/site-functions/_notmuch-mailmover
+
+      - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+
+      - name: Package
+        shell: nix develop .#ci -c bash -e {0}
+        run: |
+          # A tag build describes as exactly vX.Y.Z. workflow_dispatch on a
+          # branch yields X.Y.Z-N-gHASH instead; keep that as a prerelease so
+          # it never claims an already-released version number.
+          version=$(git describe --tags --match 'v*' --always | sed 's/^v//')
+          case $version in
+            *-*-*) version=${version%%-*}-dev.${version##*-} ;;
+          esac
+
+          for format in deb rpm; do
+            PKG_ARCH=${{ matrix.arch }} PKG_VERSION=$version \
+              nfpm package --config nfpm.yaml --packager "$format" \
+                --target "dist/notmuch-mailmover_${version}_${{ matrix.arch }}.$format"
+          done
+
+          tar --zstd -chf "dist/notmuch-mailmover_${version}_Linux_${{ matrix.arch }}.tar.zst" \
+            -C dist/tree . -C "$PWD" LICENSE
+          rm -rf dist/tree
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          distribution: goreleaser
-          version: '~> v2'
-          args: release --clean
+          name: dist-${{ matrix.arch }}
+          path: dist/
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+
+      # git-cliff comes from the flake's ci shell, pinned by flake.lock.
+      - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+
+      # Grouping and filtering live in cliff.toml.
+      - name: Changelog
+        run: |
+          # A tag push wants the range that ends at that tag; workflow_dispatch
+          # on a branch wants everything committed since the last tag.
+          if git describe --tags --exact-match HEAD >/dev/null 2>&1; then
+            range=--latest
+          else
+            range=--unreleased
+          fi
+          nix develop .#ci -c git-cliff "$range" | tee changelog.md
+
+      - name: Checksums
+        run: sha256sum dist/* | tee dist/checksums.txt
+
+      # Only a v* tag push publishes; workflow_dispatch and branch pushes run
+      # everything above and stop here.
+      - name: Publish
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" --draft --title "$TAG" \
+            --notes-file changelog.md dist/*

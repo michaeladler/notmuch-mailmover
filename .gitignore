@@ -1,4 +1,5 @@
 /target
 /result
 /dist
+/share/notmuch-mailmover.1.gz
 .pre-commit-config.yaml
