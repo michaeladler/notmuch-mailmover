@@ -30,6 +30,11 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v17
+        with:
+          name: michaeladler
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - name: Generate code coverage
         # The devShell carries the toolchain and every build and test dependency.
         run: nix develop --command cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
