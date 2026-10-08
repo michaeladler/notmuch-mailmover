@@ -57,6 +57,11 @@
 
                 nativeBuildInputs = [
                   pkgs.pkg-config
+                  pkgs.installShellFiles
+                ];
+
+                nativeCheckInputs = [
+                  pkgs.notmuch
                 ];
 
                 buildInputs = [
@@ -89,12 +94,13 @@
             // {
               inherit cargoArtifacts;
 
-              # The integration tests shell out to the notmuch CLI; buildInputs
-              # are not on the PATH while the tests run.
-              nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
-                pkgs.installShellFiles
-                pkgs.notmuch
-              ];
+              # cachix needs cargoArtifacts pushed separately: buildDepsOnly output is a
+              # build-time input, so it is not part of the package's runtime closure.
+              passthru.cargoArtifacts = cargoArtifacts;
+
+              nativeBuildInputs = commonArgs.nativeBuildInputs;
+
+              nativeCheckInputs = commonArgs.nativeCheckInputs;
 
               postInstall = ''
                 installManPage share/notmuch-mailmover.1
@@ -153,11 +159,7 @@
             commonArgs
             // {
               inherit cargoArtifacts;
-              # The integration tests shell out to the notmuch CLI; buildInputs
-              # are not on the PATH while the tests run.
-              nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
-                pkgs.notmuch
-              ];
+              nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ (commonArgs.nativeCheckInputs or [ ]);
               partitions = 1;
               partitionType = "count";
               cargoNextestPartitionsExtraArgs = "--no-tests=pass";
@@ -231,17 +233,15 @@
         in
         {
           default = craneLib.devShell {
-            # Inherit inputs from checks (notmuch, lua5_4, toolchain, ...).
             checks = self.checks.${system};
 
             packages = [
-              pkgs.notmuch
-              pkgs.lua5_4
               pkgs.cargo-llvm-cov
               pkgs.zstd
               cargoDebugArtifacts
               reseedTarget
-            ];
+            ]
+            ++ commonArgs.buildInputs;
 
             # cargo-llvm-cov wants llvm-profdata and llvm-cov, which nixpkgs
             # ships outside the rustc sysroot, named by path. The version has to
