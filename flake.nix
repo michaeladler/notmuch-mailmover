@@ -213,13 +213,22 @@
 
           hydrate = ''
             mkdir -p target
-            tar -I zstd -xf ${cargoDebugArtifacts}/target.tar.zst -C target
-            # rm first: store files land read-only, so a plain cp cannot rewrite a
-            # config.toml left over from an older Cargo.lock.
-            rm -f target/cargo-home/config.toml
-            mkdir -p target/cargo-home
-            cp ${cargoVendorDir}/config.toml target/cargo-home/config.toml
+            STAMP="target/.cargo-debug-artifacts-stamp"
+
+            if [ ! -f "$STAMP" ] || [ "$(< "$STAMP")" != "${cargoDebugArtifacts}" ]; then
+              tar -I zstd -xf ${cargoDebugArtifacts}/target.tar.zst -C target
+              # Nix paths are content-addressed and immutable; when cargoDebugArtifacts changes, path string changes
+              echo -n "${cargoDebugArtifacts}" > "$STAMP"
+            fi
+
             export CARGO_HOME="$PWD/target/cargo-home"
+            mkdir -p "$CARGO_HOME"
+
+            # Update config only if vendor dir changed
+            if ! cmp -s "${cargoVendorDir}/config.toml" "$CARGO_HOME/config.toml"; then
+              rm -f "$CARGO_HOME/config.toml"
+              cp "${cargoVendorDir}/config.toml" "$CARGO_HOME/config.toml"
+            fi
           '';
 
           # Script, not a shell function in shellHook: `nix develop -c` runs the hook
